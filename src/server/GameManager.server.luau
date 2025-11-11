@@ -1,5 +1,6 @@
 -- BrickBreakerServer.lua
 
+print("this is in severver gmdfdfdf")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- RemoteEvent 준비
@@ -71,26 +72,42 @@ local function createBall()
 
 	ball.Parent = workspace
 
+	local canBounce = true
+
 	local hitDirection = "left"
 	-- 공 충돌 처리
 	ball.Touched:Connect(function(hit)
-		if hit then
-			if hit.Name == "Brick" then
-				hit:Destroy()
-			end
-			local diff = ball.Position - hit.Position
-			local vx, vy, vz = bv.Velocity.X, bv.Velocity.Y, bv.Velocity.Z
+		if not canBounce or not hit or hit == ball then
+			return
+		end
+		canBounce = false
+		task.delay(0.05, function()
+			canBounce = true
+		end)
 
-			-- 충돌 방향 판정 (어느 축으로 더 가까운가)
-			if hitDirection == "left" then
-				hitDirection = "right"
-				-- 가로 방향 충돌 → X축 반전
-				bv.Velocity = bv.velocity * -1
-			else
-				hitDirection = "left"
-				-- 세로 방향 충돌 → Y축 반전
-				bv.Velocity = bv.velocity * 1
-			end
+		if hit.Name == "Brick" then
+			hit:Destroy()
+			-- task.delay(0.05, function()
+			-- 	canBounce = true
+			-- end)
+		end
+
+		if hit.Name == "Wall" then
+			-- task.delay(0.05, function()
+			-- 	canBounce = true
+			-- end)
+			canBounce = true
+		end
+
+		local velocity = bv.Velocity
+		local randomAxis = math.random(0, 1) -- 0: X축 반전, 1: Z축 반전
+
+		if randomAxis == 0 then
+			bv.Velocity = Vector3.new(-velocity.X, velocity.Y, velocity.Z)
+		elseif randomAxis == 1 then
+			bv.Velocity = Vector3.new(velocity.X, -velocity.Y, velocity.Z)
+		else
+			bv.Velocity = Vector3.new(velocity.X, velocity.Y, -velocity.Z)
 		end
 	end)
 end

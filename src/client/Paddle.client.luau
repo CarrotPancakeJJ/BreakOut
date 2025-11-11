@@ -1,5 +1,5 @@
 -- BrickBreakerClient.lua
-
+print("heelo")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -24,5 +24,3 @@ UserInputService.InputBegan:Connect(function(input)
 		paddle.Position = paddle.Position + Vector3.new(speed, 0, 0)
 	end
 end)
-
-print("heelo")
