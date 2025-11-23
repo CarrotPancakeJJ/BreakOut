@@ -1,6 +1,4 @@
 -- BrickBreakerServer.lua
-
-print("this is in severver gmdfdfdf")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- RemoteEvent 준비
@@ -33,15 +31,15 @@ local function createBricks()
 	bricksFolder.Parent = workspace
 
 	local startX = -20
-	local startY = 20
-	local brickSize = Vector3.new(4, 2, 2)
+	local startY = 50
+	local brickSize = Vector3.new(10, 4, 4)
 
-	for row = 1, 5 do
-		for col = 1, 10 do
+	for row = 1, 7 do
+		for col = 1, 12 do
 			local brick = Instance.new("Part")
 			brick.Size = brickSize
 			brick.Anchored = true
-			brick.Position = Vector3.new(startX + col * 5, startY - row * 3, 0)
+			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
 			brick.Name = "Brick"
 			brick.Parent = bricksFolder
@@ -111,8 +109,5 @@ local function createBall()
 		end
 	end)
 end
--- 게임 시작 이벤트 연결
-startEvent.OnServerEvent:Connect(function(player)
-	createBricks()
-	createBall()
-end)
+createBricks()
+createBall()
