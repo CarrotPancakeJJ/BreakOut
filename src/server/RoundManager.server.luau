@@ -1,63 +1,88 @@
-local intermission = 5
-local roundLength = 120
+local intermission = 200
+local roundLength = 30
 
-local SoundService = game:GetService("SoundService")
 local inRound = game.ReplicatedStorage.InRound
 local status = game.ReplicatedStorage.Status
+local soundService = game:GetService("SoundService")
+
+-- 현재 재생 중인 음악 추적
+local currentMusic = nil
 
 -- GameManager의 함수들이 로드될 때까지 대기
 task.wait(0.1)
 
--- SoundService에서 모든 Sound 찾기 함수
-local function getAllSounds()
-	local sounds = {}
+-- MapSpawn 목록 가져오기 함수
+local function getMapSpawns()
+	local mapSpawns = {}
 
-	for _, obj in pairs(SoundService:GetChildren()) do
-		if obj:IsA("Sound") then
-			table.insert(sounds, obj)
+	-- 방법 1: "MapSpawn"으로 시작하는 모든 파트 찾기
+	for _, obj in pairs(workspace:GetChildren()) do
+		if obj:IsA("BasePart") and obj.Name:match("^MapSpawn") then
+			table.insert(mapSpawns, obj)
 		end
 	end
 
-	return sounds
-end
-
--- 현재 재생 중인 Sound
-local currentSound = nil
-
--- 랜덤 오디오 재생 함수
-local function playRandomAudio()
-	local sounds = getAllSounds()
-
-	if #sounds == 0 then
-		warn("SoundService에서 오디오를 찾을 수 없습니다.")
-		return
-	end
-
-	-- 기존에 재생 중인 오디오 정지
-	if currentSound and currentSound.IsPlaying then
-		currentSound:Stop()
-	end
-
-	-- 랜덤으로 하나 선택하여 재생
-	local randomIndex = math.random(1, #sounds)
-	currentSound = sounds[randomIndex]
-
-	-- 노래가 끝나면 다음 노래 재생
-	currentSound.Ended:Connect(function()
-		if inRound.Value then
-			playRandomAudio()
+	-- 방법 2: MapSpawns 폴더가 있으면 그 안의 모든 파트 찾기
+	local mapSpawnsFolder = workspace:FindFirstChild("MapSpawns")
+	if mapSpawnsFolder then
+		for _, obj in pairs(mapSpawnsFolder:GetChildren()) do
+			if obj:IsA("BasePart") then
+				table.insert(mapSpawns, obj)
+			end
 		end
-	end)
+	end
 
-	currentSound:Play()
-	print("오디오 재생: " .. currentSound.Name)
+	-- 방법 3: 기존 MapSpawn이 있으면 추가 (하위 호환성)
+	local oldMapSpawn = workspace:FindFirstChild("MapSpawn")
+	if oldMapSpawn and oldMapSpawn:IsA("BasePart") then
+		-- 이미 목록에 없으면 추가
+		local found = false
+		for _, spawn in ipairs(mapSpawns) do
+			if spawn == oldMapSpawn then
+				found = true
+				break
+			end
+		end
+		if not found then
+			table.insert(mapSpawns, oldMapSpawn)
+		end
+	end
+
+	return mapSpawns
 end
 
--- 오디오 정지 함수
-local function stopAudio()
-	if currentSound and currentSound.IsPlaying then
-		currentSound:Stop()
-		currentSound = nil
+-- 랜덤 MapSpawn 선택 함수
+local function getRandomMapSpawn()
+	local mapSpawns = getMapSpawns()
+
+	if #mapSpawns == 0 then
+		warn("MapSpawn을 찾을 수 없습니다. 기본 MapSpawn을 사용합니다.")
+		local defaultSpawn = workspace:FindFirstChild("MapSpawn")
+		if defaultSpawn and defaultSpawn:IsA("BasePart") then
+			return defaultSpawn
+		end
+		return nil
+	end
+
+	-- 랜덤하게 하나 선택
+	local randomIndex = math.random(1, #mapSpawns)
+	return mapSpawns[randomIndex]
+end
+
+-- 플레이어를 MapSpawn으로 텔레포트하는 함수
+local function teleportPlayersToMapSpawn()
+	local randomMapSpawn = getRandomMapSpawn()
+
+	if randomMapSpawn then
+		for i, plr in pairs(game.Players:GetChildren()) do
+			local char = plr.Character
+			if char then
+				local humanRoot = char:WaitForChild("HumanoidRootPart")
+				humanRoot.CFrame = randomMapSpawn.CFrame
+			end
+		end
+	else
+		warn("MapSpawn을 찾을 수 없어 플레이어를 텔레포트할 수 없습니다.")
 	end
 end
 
@@ -77,6 +102,72 @@ local function removeStartGameWall()
 	end
 end
 
+-- 현재 음악 정지 함수
+local function stopCurrentMusic()
+	if currentMusic and currentMusic.IsPlaying then
+		currentMusic:Stop()
+	end
+	currentMusic = nil
+end
+
+-- 로비 음악 재생 함수
+local function playLobbyMusic()
+	stopCurrentMusic()
+
+	local lobbyMusicFolder = soundService:FindFirstChild("LobbyMusic")
+	if not lobbyMusicFolder then
+		warn("SoundService에서 LobbyMusic 폴더를 찾을 수 없습니다.")
+		return
+	end
+
+	local musicTracks = {}
+	for _, sound in pairs(lobbyMusicFolder:GetChildren()) do
+		if sound:IsA("Sound") then
+			table.insert(musicTracks, sound)
+		end
+	end
+
+	if #musicTracks == 0 then
+		warn("LobbyMusic 폴더에 음악이 없습니다.")
+		return
+	end
+
+	-- 랜덤으로 하나 선택하여 재생
+	local randomIndex = math.random(1, #musicTracks)
+	currentMusic = musicTracks[randomIndex]
+	currentMusic:Play()
+	print("로비 음악 재생: " .. currentMusic.Name)
+end
+
+-- 게임 음악 재생 함수
+local function playGameMusic()
+	stopCurrentMusic()
+
+	local gameMusicFolder = soundService:FindFirstChild("GameMusic")
+	if not gameMusicFolder then
+		warn("SoundService에서 GameMusic 폴더를 찾을 수 없습니다.")
+		return
+	end
+
+	local musicTracks = {}
+	for _, sound in pairs(gameMusicFolder:GetChildren()) do
+		if sound:IsA("Sound") then
+			table.insert(musicTracks, sound)
+		end
+	end
+
+	if #musicTracks == 0 then
+		warn("GameMusic 폴더에 음악이 없습니다.")
+		return
+	end
+
+	-- 랜덤으로 하나 선택하여 재생
+	local randomIndex = math.random(1, #musicTracks)
+	currentMusic = musicTracks[randomIndex]
+	currentMusic:Play()
+	print("게임 음악 재생: " .. currentMusic.Name)
+end
+
 inRound.Changed:Connect(function()
 	if inRound.Value == false then
 		-- 라운드가 끝나면 로비로 텔레포트
@@ -87,15 +178,9 @@ inRound.Changed:Connect(function()
 				humanRoot.CFrame = game.Workspace.LobbySpawn.CFrame
 			end
 		end
-		-- 오디오 정지
-		stopAudio()
-	elseif inRound.Value == true then
-		-- inRound가 true가 되면 공 생성
-		if _G.createBall then
-			_G.createBall()
-		end
-		-- 게임 시작 시 랜덤 오디오 재생
-		playRandomAudio()
+
+		-- 로비 음악 재생
+		playLobbyMusic()
 	end
 end)
 
@@ -110,13 +195,10 @@ local function round()
 
 		-- intermission이 끝나면 먼저 MapSpawn으로 텔레포트
 		status.Value = "Teleporting to map..."
-		for i, plr in pairs(game.Players:GetChildren()) do
-			local char = plr.Character
-			if char then
-				local humanRoot = char:WaitForChild("HumanoidRootPart")
-				humanRoot.CFrame = game.Workspace.MapSpawn.CFrame
-			end
-		end
+		teleportPlayersToMapSpawn()
+
+		-- 텔레포트 직후 게임 음악 재생
+		playGameMusic()
 
 		-- 텔레포트 후 블럭 생성
 		if _G.createBricks then
@@ -132,8 +214,13 @@ local function round()
 		-- StartGameWall 제거
 		removeStartGameWall()
 
-		-- 그 다음 inRound를 true로 설정 (공은 inRound.Changed에서 생성됨)
+		-- 그 다음 inRound를 true로 설정
 		inRound.Value = true
+
+		-- inRound가 true가 되면 공 생성
+		if _G.createBall then
+			_G.createBall()
+		end
 
 		for i = roundLength, 0, -1 do
 			status.Value = "Game will end in " .. i .. " seconds"
@@ -141,5 +228,8 @@ local function round()
 		end
 	end
 end
+
+-- 게임 시작 시 로비 음악 재생
+playLobbyMusic()
 
 task.spawn(round)
