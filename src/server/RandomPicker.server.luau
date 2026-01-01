@@ -1,6 +1,9 @@
 -- Server Script (ServerScriptService 권장)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Teams = game:GetService("Teams")
+local killerTeam = Teams:FindFirstChild("Killer")
+local playerTeam = Teams:FindFirstChild("Player")
 
 -- PickTagEvent는 ReplicatedStorage 안에 RemoteEvent로 존재해야 합니다.
 local PickTagEvent = ReplicatedStorage:WaitForChild("PickTagEvent")
@@ -38,15 +41,21 @@ local function pickRandomPlayer()
 		warn("[서버] 플레이어가 없습니다.")
 		return
 	end
-
 	local randomIndex = math.random(1, #playerList)
 	local selectedPlayer = playerList[randomIndex]
 	print(string.format("[서버] 선택된 플레이어: %s (UserId=%d)", selectedPlayer.Name, selectedPlayer.UserId))
 
 	local plrIcon = GetPlayerIcon(selectedPlayer)
 
-	-- 모든 클라이언트에게 통지 (플레이어 이름, 아이콘 URL)
-	PickTagEvent:FireAllClients(selectedPlayer.Name, plrIcon)
+	for row = 1, #playerList do
+		if playerList[row] == selectedPlayer then
+			playerList[row].Team = killerTeam
+			playerList[row].TeamColor = killerTeam.TeamColor
+		else
+			playerList[row].Team = playerTeam
+			playerList[row].TeamColor = playerTeam.TeamColor
+		end
+	end
 end
 
 -- ===== 테스트용: 게임 시작 시 또는 5초마다 랜덤 선택 (개발용) =====
