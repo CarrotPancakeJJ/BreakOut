@@ -73,7 +73,7 @@ local function getCollisionAxis(ball, hitPart)
 	end
 end
 
--- 공 생성 함수 (수정됨)
+-- 공 생성 함수
 local function createBall()
 	local oldBall = workspace:FindFirstChild("Ball")
 	if oldBall then
@@ -89,9 +89,8 @@ local function createBall()
 	ball.BrickColor = BrickColor.new("White")
 	ball.Name = "Ball"
 
-	-- 마찰력을 0으로 설정하여 물리적 끼임 방지 (중요)
+	-- 마찰력을 0으로 설정하여 물리적 끼임 방지
 	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 1, 100, 100)
-	-- (Density, Friction, Elasticity, FrictionWeight, ElasticityWeight)
 
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = Vector3.new(20, 20, 0)
@@ -102,41 +101,80 @@ local function createBall()
 
 	local canBounce = true
 
+	-- GameObjects 폴더 가져오기
+	local gameObjects = workspace:FindFirstChild("GameObjects")
+	local leftWall, rightWall, paddle
+	if gameObjects then
+		leftWall = gameObjects:FindFirstChild("LeftWall")
+		rightWall = gameObjects:FindFirstChild("RightWall")
+		paddle = gameObjects:FindFirstChild("Paddle")
+
+		-- CanCollide와 CanTouch 확실히 설정
+		if leftWall then
+			leftWall.CanCollide = true
+			leftWall.CanTouch = true
+		end
+		if rightWall then
+			rightWall.CanCollide = true
+			rightWall.CanTouch = true
+		end
+		if paddle then
+			paddle.CanCollide = true
+			paddle.CanTouch = true
+		end
+	end
+
 	-- 공 충돌 처리
 	ball.Touched:Connect(function(hit)
-		-- 이미 튕기는 중이거나, 히트 파트가 없거나, 자기 자신이면 무시
 		if not canBounce or not hit or hit == ball then
 			return
 		end
+		local collisionAxis
 
-		-- 1. 일단 충돌 감지되면 즉시 튕김 방지
+		-- 충돌 감지되면 즉시 튕김 방지
 		canBounce = false
 
-		-- 2. 벽돌인 경우 파괴 로직
+		-- 벽돌 파괴
 		if hit.Name == "Brick" then
 			hit:Destroy()
 		end
 
-		-- 3. 반사 벡터 계산 (벽, 패들, 벽돌 모두 공통 적용)
-		local collisionAxis = getCollisionAxis(ball, hit)
-		local velocity = bv.Velocity
-
-		if collisionAxis == "X" then
-			bv.Velocity = Vector3.new(-velocity.X, velocity.Y, velocity.Z)
-		elseif collisionAxis == "Y" then
-			bv.Velocity = Vector3.new(velocity.X, -velocity.Y, velocity.Z)
-		else -- "Z"
-			bv.Velocity = Vector3.new(velocity.X, velocity.Y, -velocity.Z)
+		-- 반사방향 결정
+		if hit.Name == "LeftWall" or hit.Name == "RightWall" then
+			collisionAxis = "X"
+		elseif hit.Name == "Paddle" or hit.Name == "Brick" or hit.Name == "DeathFloor" then
+			collisionAxis = "Y"
 		end
 
-		-- 4. 쿨타임 후 다시 충돌 가능하게 설정 (통합됨)
-		-- 너무 짧으면(0.01) 벽을 빠져나오기 전에 다시 닿아서 끼일 수 있음. 0.05 정도가 적당함.
+		-- 반사 처리 (벽, 패들, 벽돌 모두 적용)
+		if
+			hit.Name == "LeftWall"
+			or hit.Name == "RightWall"
+			or hit.Name == "Paddle"
+			or hit.Name == "Brick"
+			or hit.Name == "DeathFloor"
+		then
+			-- local collisionAxis = getCollisionAxis(ball, hit)
+			local velocity = bv.Velocity
+
+			if collisionAxis == "X" then
+				bv.Velocity = Vector3.new(-velocity.X, velocity.Y, velocity.Z)
+			elseif collisionAxis == "Y" then
+				bv.Velocity = Vector3.new(velocity.X, -velocity.Y, velocity.Z)
+			else
+				bv.Velocity = Vector3.new(velocity.X, velocity.Y, -velocity.Z)
+			end
+
+			print("충돌! " .. hit.Name .. " - 축: " .. collisionAxis)
+		end
+
+		-- 쿨타임
 		task.delay(0.05, function()
 			canBounce = true
 		end)
 	end)
 end
 
--- 블럭과 공 생성 함수를 전역으로 export하여 다른 스크립트에서 호출 가능하게 함
+-- 전역 함수로 export
 _G.createBricks = createBricks
 _G.createBall = createBall

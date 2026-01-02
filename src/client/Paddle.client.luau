@@ -9,7 +9,7 @@ local PlayerModule = require(playerScripts:WaitForChild("PlayerModule"))
 -- inRound 값 가져오기
 local inRound = ReplicatedStorage:WaitForChild("InRound")
 
-player.CharacterAdded:Wait() -- 캐릭터 스폰 기다리기
+player.CharacterAdded:Wait()
 task.wait(0.1)
 
 local Controls = PlayerModule:GetControls()
@@ -31,23 +31,31 @@ inRound.Changed:Connect(function()
 	updatePlayerControls()
 end)
 
--- 패들 파트
-local paddle = workspace:WaitForChild("Paddle")
-paddle.Anchored = true -- 캐릭터 영향 없이 움직이게
+-- RemoteEvent 생성/가져오기
+local movePaddleEvent = ReplicatedStorage:FindFirstChild("MovePaddle")
+if not movePaddleEvent then
+	movePaddleEvent = Instance.new("RemoteEvent")
+	movePaddleEvent.Name = "MovePaddle"
+	movePaddleEvent.Parent = ReplicatedStorage
+end
 
 -- Killer 팀 체크
 local function isKiller()
 	return player.Team and player.Team.Name == "Killer"
 end
 
+-- 패들을 움직일 수 있는지 체크
+local function canMovePaddle()
+	return isKiller() and inRound.Value
+end
+
 -- 패들 이동 플래그
 local movingLeft = false
 local movingRight = false
-local speed = 50 --?스터드씩 이동, 필요 시 조절
 
 -- 키 입력 감지
 UserInputService.InputBegan:Connect(function(input)
-	if not isKiller() then
+	if not canMovePaddle() then
 		return
 	end
 
@@ -66,14 +74,19 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- 패들 이동 루프
-game:GetService("RunService").RenderStepped:Connect(function(dt)
-	if not isKiller() then
+-- 서버에 이동 방향 전송
+game:GetService("RunService").RenderStepped:Connect(function()
+	if not canMovePaddle() then
 		return
 	end
+
+	local direction = 0
 	if movingLeft then
-		paddle.CFrame = paddle.CFrame * CFrame.new(-speed * dt, 0, 0)
+		direction = -1
 	elseif movingRight then
-		paddle.CFrame = paddle.CFrame * CFrame.new(speed * dt, 0, 0)
+		direction = 1
 	end
+
+	-- 서버로 방향 전송
+	movePaddleEvent:FireServer(direction)
 end)

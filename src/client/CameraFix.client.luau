@@ -105,7 +105,8 @@ local function setupCameraForTeam()
 
 		-- 예시 1: Workspace에 있는 "CameraPart"에 카메라 고정
 		task.wait(0.5)
-		local cameraPart = workspace:FindFirstChild("CameraPart")
+		local gameObjects = workspace:WaitForChild("GameObjects")
+		local cameraPart = gameObjects:WaitForChild("CameraPart")
 		if cameraPart then
 			cameraConnection = lockCameraToPart(cameraPart)
 		end

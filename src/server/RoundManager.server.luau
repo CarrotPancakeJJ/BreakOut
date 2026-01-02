@@ -1,4 +1,4 @@
-local intermission = 200
+local intermission = 5
 local roundLength = 30
 
 local inRound = game.ReplicatedStorage.InRound
@@ -15,36 +15,20 @@ task.wait(0.1)
 local function getMapSpawns()
 	local mapSpawns = {}
 
-	-- 방법 1: "MapSpawn"으로 시작하는 모든 파트 찾기
+	-- 방법 1: "MapSpawn"으로 시작하는 모든 파트 찾기 (workspace 최상위)
 	for _, obj in pairs(workspace:GetChildren()) do
 		if obj:IsA("BasePart") and obj.Name:match("^MapSpawn") then
 			table.insert(mapSpawns, obj)
 		end
 	end
 
-	-- 방법 2: MapSpawns 폴더가 있으면 그 안의 모든 파트 찾기
-	local mapSpawnsFolder = workspace:FindFirstChild("MapSpawns")
-	if mapSpawnsFolder then
-		for _, obj in pairs(mapSpawnsFolder:GetChildren()) do
-			if obj:IsA("BasePart") then
+	-- 방법 2: GameObjects 폴더 안에서 "MapSpawn"으로 시작하는 파트만 찾기
+	local gameObjectsFolder = workspace:FindFirstChild("GameObjects")
+	if gameObjectsFolder then
+		for _, obj in pairs(gameObjectsFolder:GetChildren()) do
+			if obj:IsA("BasePart") and obj.Name:match("^MapSpawn") then
 				table.insert(mapSpawns, obj)
 			end
-		end
-	end
-
-	-- 방법 3: 기존 MapSpawn이 있으면 추가 (하위 호환성)
-	local oldMapSpawn = workspace:FindFirstChild("MapSpawn")
-	if oldMapSpawn and oldMapSpawn:IsA("BasePart") then
-		-- 이미 목록에 없으면 추가
-		local found = false
-		for _, spawn in ipairs(mapSpawns) do
-			if spawn == oldMapSpawn then
-				found = true
-				break
-			end
-		end
-		if not found then
-			table.insert(mapSpawns, oldMapSpawn)
 		end
 	end
 
@@ -88,7 +72,8 @@ end
 
 -- StartGameWall 제거 함수
 local function removeStartGameWall()
-	local startGameWall = workspace:FindFirstChild("StartGameWall")
+	local gameObjects = workspace:WaitForChild("GameObjects")
+	local startGameWall = gameObjects:WaitForChild("StartGameWall")
 	if startGameWall then
 		startGameWall:Destroy()
 		print("StartGameWall이 제거되었습니다.")
