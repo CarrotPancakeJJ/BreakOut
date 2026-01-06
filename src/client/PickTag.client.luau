@@ -33,20 +33,6 @@ PickTagEvent.OnClientEvent:Connect(function(tagName, tagIconUrl)
 	)
 end)
 
--- local testUserIds = { 1, 2, 3, 4, 5 }
-
--- local function getRandomPlayerIcon()
--- 	local id = testUserIds[math.random(1, #testUserIds)]
--- 	local content, ready =
--- 		Players:GetUserThumbnailAsync(id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-
--- 	if ready then
--- 		return content
--- 	else
--- 		return ""
--- 	end
--- end
-
 -- 랜덤 플레이어 아이콘과 이름 가져오기
 local function getRandomPlayerIconAndName()
 	local list = Players:GetPlayers()

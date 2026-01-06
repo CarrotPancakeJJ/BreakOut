@@ -32,7 +32,7 @@ local function createBricks()
 
 	local startX = -20
 	local startY = 50
-	local brickSize = Vector3.new(10, 4, 4)
+	local brickSize = Vector3.new(8, 4, 4)
 
 	for row = 1, 7 do
 		for col = 1, 12 do
@@ -140,7 +140,7 @@ local function createBall()
 		end
 
 		-- 반사방향 결정
-		if hit.Name == "LeftWall" or hit.Name == "RightWall" then
+		if hit.Name == "LeftWall" or hit.Name == "RightWall" or hit.Name == "TopWall" then
 			collisionAxis = "X"
 		elseif hit.Name == "Paddle" or hit.Name == "Brick" or hit.Name == "DeathFloor" then
 			collisionAxis = "Y"
@@ -150,6 +150,7 @@ local function createBall()
 		if
 			hit.Name == "LeftWall"
 			or hit.Name == "RightWall"
+			or hit.Name == "TopWall"
 			or hit.Name == "Paddle"
 			or hit.Name == "Brick"
 			or hit.Name == "DeathFloor"
@@ -175,6 +176,23 @@ local function createBall()
 	end)
 end
 
--- 전역 함수로 export
+local function cleanupGame()
+	-- 1. 공 제거
+	local ball = workspace:FindFirstChild("Ball")
+	if ball then
+		ball:Destroy()
+		print("공이 제거되었습니다.")
+	end
+
+	-- 2. 벽돌 폴더 제거
+	local bricksFolder = workspace:FindFirstChild("Bricks")
+	if bricksFolder then
+		bricksFolder:Destroy()
+		print("벽돌 폴더가 제거되었습니다.")
+	end
+end
+
+-- 전역 함수로 등록하여 RoundManager에서 사용할 수 있게 함
+_G.cleanupGame = cleanupGame
 _G.createBricks = createBricks
 _G.createBall = createBall
