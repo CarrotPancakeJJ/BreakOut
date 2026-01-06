@@ -1,14 +1,11 @@
--- Server Script (ServerScriptService 권장)
+-- Server Script (ServerScriptService)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Teams = game:GetService("Teams")
 local killerTeam = Teams:FindFirstChild("Killer")
 local playerTeam = Teams:FindFirstChild("Player")
 
--- PickTagEvent는 ReplicatedStorage 안에 RemoteEvent로 존재해야 합니다.
-local PickTagEvent = ReplicatedStorage:WaitForChild("PickTagEvent")
-
-local noIconFound = "" -- 빈 문자열 또는 기본 아이콘 rbxassetid://123456 를 넣어두세요
+local noIconFound = ""
 
 local function GetPlayerIcon(player)
 	if not player or not player.UserId then
@@ -51,20 +48,16 @@ local function pickRandomPlayer()
 		if playerList[row] == selectedPlayer then
 			playerList[row].Team = killerTeam
 			playerList[row].TeamColor = killerTeam.TeamColor
+			print(playerList[row].Name .. "을(를) Killer 팀에 배정했습니다.")
 		else
 			playerList[row].Team = playerTeam
 			playerList[row].TeamColor = playerTeam.TeamColor
+			print(playerList[row].Name .. "을(를) Player 팀에 배정했습니다.")
 		end
 	end
+
+	return selectedPlayer, plrIcon
 end
 
--- ===== 테스트용: 게임 시작 시 또는 5초마다 랜덤 선택 (개발용) =====
--- 서버에서 바로 테스트하려면 아래 호출을 사용하세요. 실제 게임에선 라운드 시작/종료에 맞춰 호출.
-wait(2)
-pickRandomPlayer()
-
--- 또는 주기적으로 테스트하려면:
--- while true do
---     wait(10)
---     pickRandomPlayer()
--- end
+-- 전역 함수로 export
+_G.pickRandomPlayer = pickRandomPlayer
