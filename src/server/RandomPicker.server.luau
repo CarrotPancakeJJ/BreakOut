@@ -5,6 +5,14 @@ local Teams = game:GetService("Teams")
 local killerTeam = Teams:FindFirstChild("Killer")
 local playerTeam = Teams:FindFirstChild("Player")
 
+-- RemoteEvent 생성
+local showKillerEvent = ReplicatedStorage:FindFirstChild("ShowKiller")
+if not showKillerEvent then
+	showKillerEvent = Instance.new("RemoteEvent")
+	showKillerEvent.Name = "ShowKiller"
+	showKillerEvent.Parent = ReplicatedStorage
+end
+
 local noIconFound = ""
 
 local function GetPlayerIcon(player)
@@ -38,12 +46,14 @@ local function pickRandomPlayer()
 		warn("[서버] 플레이어가 없습니다.")
 		return
 	end
+
 	local randomIndex = math.random(1, #playerList)
 	local selectedPlayer = playerList[randomIndex]
 	print(string.format("[서버] 선택된 플레이어: %s (UserId=%d)", selectedPlayer.Name, selectedPlayer.UserId))
 
 	local plrIcon = GetPlayerIcon(selectedPlayer)
 
+	-- 팀 배정
 	for row = 1, #playerList do
 		if playerList[row] == selectedPlayer then
 			playerList[row].Team = killerTeam
@@ -55,6 +65,10 @@ local function pickRandomPlayer()
 			print(playerList[row].Name .. "을(를) Player 팀에 배정했습니다.")
 		end
 	end
+
+	-- 모든 클라이언트에게 Killer 정보 전송
+	showKillerEvent:FireAllClients(selectedPlayer.Name, plrIcon)
+	print("Killer 정보 전송: " .. selectedPlayer.Name)
 
 	return selectedPlayer, plrIcon
 end

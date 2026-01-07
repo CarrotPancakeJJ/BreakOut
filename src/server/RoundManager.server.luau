@@ -1,5 +1,5 @@
-local intermission = 15
-local roundLength = 10
+local intermission = 30
+local roundLength = 100
 
 local InRound = game.ReplicatedStorage.InRound
 local status = game.ReplicatedStorage.Status
@@ -137,18 +137,6 @@ local function getRandomLobbySpawn()
 	local randomIndex = math.random(1, #lobbySpawns)
 	return lobbySpawns[randomIndex]
 end
-
--- 플레이어를 MapSpawn으로 텔레포트하는 함수
--- local function teleportPlayersToMapSpawn()
--- 	for i, plr in pairs(game.Players:GetChildren()) do
--- 		local randomMapSpawn = getRandomMapSpawn() -- 각 플레이어마다 랜덤
--- 		local char = plr.Character
--- 		if char then
--- 			local humanRoot = char:WaitForChild("HumanoidRootPart")
--- 			humanRoot.CFrame = randomMapSpawn.CFrame
--- 		end
--- 	end
--- end
 
 -- StartGameWall 제거 함수
 local function removeStartGameWall()
@@ -496,8 +484,15 @@ local function round()
 
 		-- intermission이 끝나면 팀 배정
 		status.Value = "Selecting Killer..."
+		local selectedPlayer, plrIcon
 		if _G.pickRandomPlayer then
-			_G.pickRandomPlayer()
+			selectedPlayer, plrIcon = _G.pickRandomPlayer() -- 반환값 받기
+		end
+
+		if selectedPlayer then
+			status.Value = "Killer is: " .. selectedPlayer.Name .. "!"
+		else
+			status.Value = "Killer selected!"
 		end
 		task.wait(2)
 
