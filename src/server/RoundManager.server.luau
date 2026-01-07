@@ -411,7 +411,7 @@ InRound.Changed:Connect(function()
 	end
 end)
 
--- 플레이어를 각 팀에 맞게 텔레포트하는 함수
+-- 팀에 맞게 텔레포트
 local function teleportPlayersByTeam()
 	local Teams = game:GetService("Teams")
 	local killerTeam = Teams:FindFirstChild("Killer")
@@ -421,8 +421,7 @@ local function teleportPlayersByTeam()
 		warn("CameraPart를 찾을 수 없습니다!")
 	end
 
-	-- 랜덤 MapSpawn 선택
-	local randomMapSpawn = getRandomMapSpawn()
+	-- [중요] 기존에 여기 있던 randomMapSpawn 설정을 삭제합니다.
 
 	for _, plr in pairs(game.Players:GetPlayers()) do
 		local char = plr.Character
@@ -430,27 +429,23 @@ local function teleportPlayersByTeam()
 			local humanRoot = char:FindFirstChild("HumanoidRootPart")
 			if humanRoot then
 				if plr.Team == killerTeam and cameraPart then
-					-- Killer는 CameraPart 위치로
+					-- Killer 처리 (항상 CameraPart 위치)
 					humanRoot.CFrame = cameraPart.CFrame
-
-					-- 즉시 고정
 					humanRoot.Anchored = true
-
-					-- 투명하게 만들기
 					makePlayerInvisible(char)
+					print(plr.Name .. " (Killer) - CameraPart로 텔레포트")
+				elseif plr.Team == playerTeam then
+					-- [수정 부분] 여기서 플레이어마다 각각 랜덤 위치를 새로 뽑습니다.
+					local randomMapSpawn = getRandomMapSpawn()
 
-					print(plr.Name .. " (Killer) - CameraPart로 텔레포트, 고정 및 투명화")
-				elseif plr.Team == playerTeam and randomMapSpawn then
-					-- Player는 MapSpawn 위치로
-					humanRoot.CFrame = randomMapSpawn.CFrame
-
-					-- Player는 고정하지 않음
-					humanRoot.Anchored = false
-
-					-- Player는 보이게 (혹시 몰라서)
-					makePlayerVisible(char)
-
-					print(plr.Name .. " (Player) - MapSpawn으로 텔레포트")
+					if randomMapSpawn then
+						humanRoot.CFrame = randomMapSpawn.CFrame
+						humanRoot.Anchored = false
+						makePlayerVisible(char)
+						print(plr.Name .. " (Player) - " .. randomMapSpawn.Name .. "으로 텔레포트")
+					else
+						warn(plr.Name .. "에게 줄 MapSpawn이 없습니다!")
+					end
 				end
 			end
 		end
