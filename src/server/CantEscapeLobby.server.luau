@@ -52,7 +52,6 @@ end
 local cooldowns = {}
 
 outField.Touched:Connect(function(hit)
-	print("충돌했으!")
 	local character = hit.Parent
 	local player = Players:GetPlayerFromCharacter(character)
 

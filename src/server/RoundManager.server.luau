@@ -451,6 +451,26 @@ local function teleportPlayersByTeam()
 		end
 	end
 end
+local function isKillerAlive()
+	local killerTeam = Teams:FindFirstChild("Killer")
+	if not killerTeam then
+		return false
+	end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player.Team == killerTeam then
+			local character = player.Character
+			if character then
+				local humanoid = character:FindFirstChild("Humanoid")
+				if humanoid and humanoid.Health > 0 then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
+end
 
 local function round()
 	while true do
@@ -532,6 +552,16 @@ local function round()
 
 		for i = roundLength, 0, -1 do
 			if gameEnded then
+				break
+			end
+
+			-- Killer 중도 퇴장 / 사망 체크
+			if not isKillerAlive() then
+				status.Value = "Killer has left the game!"
+				task.wait(2)
+
+				local playerTeam = Teams:FindFirstChild("Player")
+				handleVictory(playerTeam)
 				break
 			end
 
