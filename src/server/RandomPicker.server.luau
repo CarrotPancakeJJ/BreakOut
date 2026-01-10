@@ -1,17 +1,33 @@
--- Server Script (ServerScriptService)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Teams = game:GetService("Teams")
-local killerTeam = Teams:FindFirstChild("Killer")
-local playerTeam = Teams:FindFirstChild("Player")
 
--- RemoteEvent 생성
+local killerTeam = Teams:WaitForChild("Killer")
+local playerTeam = Teams:WaitForChild("Player")
+
+-------------------------------------------------
+-- RemoteEvents
+-------------------------------------------------
+
+-- 룰렛 시작 (기존)
 local showKillerEvent = ReplicatedStorage:FindFirstChild("ShowKiller")
 if not showKillerEvent then
 	showKillerEvent = Instance.new("RemoteEvent")
 	showKillerEvent.Name = "ShowKiller"
 	showKillerEvent.Parent = ReplicatedStorage
 end
+
+-- 룰렛 종료 (신규)
+local rouletteFinishedEvent = ReplicatedStorage:FindFirstChild("RouletteFinished")
+if not rouletteFinishedEvent then
+	rouletteFinishedEvent = Instance.new("RemoteEvent")
+	rouletteFinishedEvent.Name = "RouletteFinished"
+	rouletteFinishedEvent.Parent = ReplicatedStorage
+end
+
+-------------------------------------------------
+-- 아이콘 가져오기 (기존 유지)
+-------------------------------------------------
 
 local noIconFound = ""
 
@@ -20,25 +36,25 @@ local function GetPlayerIcon(player)
 		return noIconFound
 	end
 
-	local userId = player.UserId
-	local thumbType = Enum.ThumbnailType.HeadShot
-	local thumbSize = Enum.ThumbnailSize.Size420x420
-
 	local content, isReady
 	local ok, err = pcall(function()
-		content, isReady = Players:GetUserThumbnailAsync(userId, thumbType, thumbSize)
+		content, isReady =
+			Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 	end)
-	if not ok then
-		warn("[서버] GetUserThumbnailAsync 실패:", err)
-		return noIconFound
+
+	if ok and isReady and type(content) == "string" then
+		return content
 	end
 
-	if isReady and type(content) == "string" and content ~= "" then
-		return content
-	else
-		return noIconFound
-	end
+	return noIconFound
 end
+
+-------------------------------------------------
+-- Killer 선택 (팀 배정 X)
+-------------------------------------------------
+
+local currentKiller = nil
+local teamAssigned = false
 
 local function pickRandomPlayer()
 	local playerList = Players:GetPlayers()
@@ -47,31 +63,51 @@ local function pickRandomPlayer()
 		return
 	end
 
-	local randomIndex = math.random(1, #playerList)
-	local selectedPlayer = playerList[randomIndex]
-	print(string.format("[서버] 선택된 플레이어: %s (UserId=%d)", selectedPlayer.Name, selectedPlayer.UserId))
+	currentKiller = playerList[math.random(1, #playerList)]
+	teamAssigned = false
 
-	local plrIcon = GetPlayerIcon(selectedPlayer)
+	print(string.format("[서버] Killer 후보 선택: %s (UserId=%d)", currentKiller.Name, currentKiller.UserId))
 
-	-- 팀 배정
-	for row = 1, #playerList do
-		if playerList[row] == selectedPlayer then
-			playerList[row].Team = killerTeam
-			playerList[row].TeamColor = killerTeam.TeamColor
-			print(playerList[row].Name .. "을(를) Killer 팀에 배정했습니다.")
+	local plrIcon = GetPlayerIcon(currentKiller)
+
+	-- 🔥 여기서는 팀 배정 안 함
+	showKillerEvent:FireAllClients(currentKiller.Name, plrIcon)
+	print("[서버] 룰렛 시작 알림 전송")
+
+	return currentKiller, plrIcon
+end
+
+-------------------------------------------------
+-- 룰렛 종료 → 팀 배정
+-------------------------------------------------
+
+rouletteFinishedEvent.OnServerEvent:Connect(function(playerWhoFired)
+	if teamAssigned then
+		return
+	end
+	if not currentKiller then
+		return
+	end
+
+	teamAssigned = true
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr == currentKiller then
+			plr.Team = killerTeam
+			plr.TeamColor = killerTeam.TeamColor
+			print(plr.Name .. " → Killer 팀")
 		else
-			playerList[row].Team = playerTeam
-			playerList[row].TeamColor = playerTeam.TeamColor
-			print(playerList[row].Name .. "을(를) Player 팀에 배정했습니다.")
+			plr.Team = playerTeam
+			plr.TeamColor = playerTeam.TeamColor
+			print(plr.Name .. " → Player 팀")
 		end
 	end
 
-	-- 모든 클라이언트에게 Killer 정보 전송
-	showKillerEvent:FireAllClients(selectedPlayer.Name, plrIcon)
-	print("Killer 정보 전송: " .. selectedPlayer.Name)
+	print("[서버] 팀 배정 완료 (트리거:", playerWhoFired.Name, ")")
+end)
 
-	return selectedPlayer, plrIcon
-end
+-------------------------------------------------
+-- 전역 함수 export (기존 유지)
+-------------------------------------------------
 
--- 전역 함수로 export
 _G.pickRandomPlayer = pickRandomPlayer

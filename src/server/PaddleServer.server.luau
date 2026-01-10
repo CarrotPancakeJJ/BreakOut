@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- 추가
 
 -- RemoteEvent 생성/가져오기
 local movePaddleEvent = ReplicatedStorage:FindFirstChild("MovePaddle")
@@ -11,16 +12,15 @@ end
 -- Paddle 가져오기
 local gameObjects = workspace:WaitForChild("GameObjects")
 local paddle = gameObjects:WaitForChild("Paddle")
-local leftWall = gameObjects:WaitForChild("LeftWall")
-local rightWall = gameObjects:WaitForChild("RightWall")
 
 paddle.Anchored = true
 paddle.CanCollide = true
 paddle.CanTouch = true
 
 local speed = 50
+local currentDirection = 0 -- 현재 이동 방향 저장 (-1, 0, 1)
 
--- 벽과 충돌 중인지 체크
+-- 벽과 충돌 중인지 체크 (최적화를 위해 필요할 때만 호출하거나 수학적 계산 권장)
 local function isTouchingWall(wallName)
 	local touchingParts = paddle:GetTouchingParts()
 	for _, part in pairs(touchingParts) do
@@ -31,22 +31,41 @@ local function isTouchingWall(wallName)
 	return false
 end
 
--- 클라이언트로부터 이동 명령 받기
+-- 클라이언트로부터 "방향 변경" 요청만 받음
 movePaddleEvent.OnServerEvent:Connect(function(player, direction)
 	-- Killer 팀인지 확인
 	if not player.Team or player.Team.Name ~= "Killer" then
 		return
 	end
 
-	local dt = 1 / 60 -- 약 60fps 기준
+	-- 방향 상태 업데이트 (유효성 검사 포함)
+	if direction == -1 or direction == 0 or direction == 1 then
+		currentDirection = direction
+	end
+end)
+
+-- 서버 자체 루프에서 이동 처리 (끊김 없는 이동의 핵심)
+RunService.Heartbeat:Connect(function(dt)
+	if currentDirection == 0 then
+		return
+	end -- 움직임 없으면 무시
 
 	-- 왼쪽 이동
-	if direction == -1 and not isTouchingWall("LeftWall") then
-		paddle.CFrame = paddle.CFrame * CFrame.new(-speed * dt, 0, 0)
+	if currentDirection == -1 then
+		if not isTouchingWall("LeftWall") then
+			paddle.CFrame = paddle.CFrame * CFrame.new(-speed * dt, 0, 0)
+		else
+			-- 벽에 닿았는데 계속 가려고 하면 멈춤 처리 (선택 사항)
+			-- currentDirection = 0
+		end
 	end
 
 	-- 오른쪽 이동
-	if direction == 1 and not isTouchingWall("RightWall") then
-		paddle.CFrame = paddle.CFrame * CFrame.new(speed * dt, 0, 0)
+	if currentDirection == 1 then
+		if not isTouchingWall("RightWall") then
+			paddle.CFrame = paddle.CFrame * CFrame.new(speed * dt, 0, 0)
+		else
+			-- currentDirection = 0
+		end
 	end
 end)

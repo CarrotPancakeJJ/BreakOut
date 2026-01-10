@@ -1,5 +1,5 @@
 local intermission = 30
-local roundLength = 100
+local roundLength = 110
 
 local InRound = game.ReplicatedStorage.InRound
 local status = game.ReplicatedStorage.Status
@@ -16,6 +16,8 @@ local gameEnded = false
 -- 현재 재생 중인 음악 추적
 local currentMusic = nil
 local musicConnection = nil
+
+local Winner = game.ReplicatedStorage:WaitForChild("Winner")
 
 -- GameManager의 함수들이 로드될 때까지 대기
 task.wait(0.1)
@@ -304,6 +306,13 @@ local function handleVictory(winningTeam)
 
 	local teamName = winningTeam.Name
 
+	-- Winner 값 설정 (중요!)
+	if teamName == "Killer" then
+		Winner.Value = "Killer"
+	else
+		Winner.Value = "Player"
+	end
+
 	-- 승리 메시지 표시
 	if teamName == "Killer" then
 		status.Value = "🔪 KILLER WINS! 🔪"
@@ -364,6 +373,9 @@ local function handleVictory(winningTeam)
 			plr.TeamColor = lobbyTeam.TeamColor
 		end
 	end
+
+	-- Winner 값 초기화
+	Winner.Value = "None"
 
 	-- 로비 음악 재생
 	playLobbyMusic()
@@ -481,18 +493,14 @@ local function round()
 		repeat
 			for i = intermission, 0, -1 do
 				local playerCount = #Players:GetPlayers()
-				status.Value = "Game will start in "
-					.. i
-					.. " seconds\nMinimum 2 players to start!\nPlayers: "
-					.. playerCount
-					.. "/15: "
+				status.Value = "Game will start in " .. i .. " seconds. Players: " .. playerCount .. "/15"
 				task.wait(1)
 			end
 
 			-- 플레이어 수 확인
 			local playerCount = #Players:GetPlayers()
 			if playerCount < 2 then
-				status.Value = "Not enough players! Waiting...\nPlayers: " .. playerCount .. "/15"
+				status.Value = "Not enough players! Waiting..."
 				task.wait(2)
 			end
 		until #Players:GetPlayers() >= 2
@@ -500,16 +508,8 @@ local function round()
 		-- intermission이 끝나면 팀 배정
 		status.Value = "Selecting Killer..."
 		local selectedPlayer, plrIcon
-		if _G.pickRandomPlayer then
-			selectedPlayer, plrIcon = _G.pickRandomPlayer() -- 반환값 받기
-		end
-
-		if selectedPlayer then
-			status.Value = "Killer is: " .. selectedPlayer.Name .. "!"
-		else
-			status.Value = "Killer selected!"
-		end
-		task.wait(2)
+		_G.pickRandomPlayer()
+		task.wait(3.5)
 
 		-- 그 다음 MapSpawn으로 텔레포트
 		status.Value = "Teleporting to map..."
@@ -530,7 +530,7 @@ local function round()
 		createStartGameWall()
 
 		-- 5초 대기
-		for i = 5, 0, -1 do
+		for i = 10, 0, -1 do
 			status.Value = "Game starting in " .. i .. " seconds"
 			task.wait(1)
 		end
