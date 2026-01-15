@@ -9,6 +9,8 @@ local playerTeam = Teams:WaitForChild("Player")
 local currentKiller = nil
 local currentKillerUserId = nil
 local teamAssigned = false
+local rouletteStarted = false
+local reservationKiller = {}
 
 -- [수정 1] 단순 true/false가 아니라 '누가' 구매 중인지 저장하는 변수로 변경
 local purchasingPlayer = nil
@@ -61,6 +63,32 @@ local function showGuiForAll()
 	showGuiEvent:FireAllClients()
 	print("모든 플레이어의 구매 GUI 표시")
 end
+
+-------------------------------------------------
+-- [Studio 테스트용] 구매 시뮬레이션
+-------------------------------------------------
+local simulatePurchaseEvent = getOrCreateEvent("SimulateKillerPurchase")
+
+simulatePurchaseEvent.OnServerEvent:Connect(function(player)
+	print("=== [테스트] 구매 시뮬레이션:", player.Name, "===")
+
+	-- 실제 ProcessReceipt와 동일한 로직
+	if currentKiller or rouletteStarted then
+		print("늦은 구매 - 이미 킬러가 있음")
+		table.insert(reservationKiller, player)
+		purchasingPlayer = nil
+		return
+	end
+
+	print("=== [테스트] 구매 성공! " .. player.Name .. " 이 킬러로 설정됨 ===")
+	currentKiller = player
+	currentKillerUserId = player.UserId
+	teamAssigned = false
+	purchasingPlayer = nil
+
+	hideGuiForAll()
+	print("=== [테스트] 구매 처리 완료 ===")
+end)
 
 -------------------------------------------------
 -- 아이콘 가져오기
@@ -147,24 +175,24 @@ local function pickRandomPlayer()
 		print(">>> 이미 킬러가 선택됨 (구매 완료)")
 		local icon = GetPlayerIcon(currentKiller)
 		showKillerEvent:FireAllClients(currentKiller.Name, icon)
-		return
+		rouletteStarted = true
+	else
+		local list = Players:GetPlayers()
+		if #list == 0 then
+			return
+		end
+		currentKiller = list[math.random(#list)]
+		currentKillerUserId = currentKiller.UserId
+		teamAssigned = false
+		purchasingPlayer = nil -- 혹시 모를 잠금 해제
+
+		local icon = GetPlayerIcon(currentKiller)
+		showKillerEvent:FireAllClients(currentKiller.Name, icon)
 	end
-
-	local list = Players:GetPlayers()
-	if #list == 0 then
-		return
-	end
-
-	currentKiller = list[math.random(#list)]
-	currentKillerUserId = currentKiller.UserId
-	teamAssigned = false
-	purchasingPlayer = nil -- 혹시 모를 잠금 해제
-
-	local icon = GetPlayerIcon(currentKiller)
-	showKillerEvent:FireAllClients(currentKiller.Name, icon)
 
 	hideGuiForAll()
 	print("=== 랜덤 킬러 선택 완료: " .. currentKiller.Name .. " ===")
+	return
 end
 
 -------------------------------------------------
@@ -193,12 +221,22 @@ end)
 -- 라운드 종료 처리
 -------------------------------------------------
 local function resetKillerSelection()
-	currentKiller = nil
-	currentKillerUserId = nil
+	if #reservationKiller > 0 then
+		print("예약자가 있습니다!")
+		currentKiller = reservationKiller[1]
+		currentKillerUserId = reservationKiller[1].UserId
+		table.remove(reservationKiller, 1)
+		hideGuiForAll()
+	else
+		print("예약자가 없어요 그냥")
+		currentKiller = nil
+		currentKillerUserId = nil
+		showGuiForAll()
+	end
 	teamAssigned = false
+	rouletteStarted = false
 	purchasingPlayer = nil -- 잠금 초기화
 
-	showGuiForAll()
 	print("킬러 선택 초기화 및 GUI 표시")
 end
 
@@ -208,6 +246,7 @@ end
 MarketplaceService.ProcessReceipt = function(receiptInfo)
 	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
 
+	print("레시피")
 	-- 플레이어가 없으면(구매하고 바로 나감) 처리 보류
 	if not player then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
@@ -220,8 +259,9 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 	print("=== 구매 처리 시작:", player.Name, "===")
 
 	-- 아주 드문 경우지만, 결제하는 사이에 랜덤 픽이 되어버렸거나 다른 사람이 샀다면?
-	if currentKiller and currentKiller ~= player then
+	if currentKiller or rouletteStarted then
 		print("늦은 구매 - 이미 킬러가 있음")
+		table.insert(reservationKiller, player)
 		-- 돈은 먹지만 킬러는 안 시켜줌 (어쩔 수 없음, 로직상)
 		purchasingPlayer = nil
 		return Enum.ProductPurchaseDecision.PurchaseGranted
@@ -247,8 +287,6 @@ end
 -------------------------------------------------
 _G.pickRandomPlayer = pickRandomPlayer
 _G.resetKillerSelection = resetKillerSelection
-
-showGuiForAll()
 
 print("==============================================")
 print("술래 선택 시스템 초기화 완료 (안전모드)")

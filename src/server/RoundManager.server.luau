@@ -379,10 +379,6 @@ local function handleVictory(winningTeam)
 
 	-- 로비 음악 재생
 	playLobbyMusic()
-
-	if _G.resetKillerSelection then
-		_G.resetKillerSelection()
-	end
 end
 
 InRound.Changed:Connect(function()
