@@ -379,6 +379,10 @@ local function handleVictory(winningTeam)
 
 	-- 로비 음악 재생
 	playLobbyMusic()
+
+	if _G.resetKillerSelection then
+		_G.resetKillerSelection()
+	end
 end
 
 InRound.Changed:Connect(function()
@@ -388,6 +392,13 @@ InRound.Changed:Connect(function()
 			_G.cleanupGame()
 		end
 	end
+
+	if gameEnded then
+		if _G.resetKillerSelection then
+			_G.resetKillerSelection()
+		end
+	end
+
 	if InRound.Value == false and not gameEnded then
 		-- 팀들
 		local Teams = game:GetService("Teams")
@@ -492,8 +503,7 @@ local function round()
 
 		repeat
 			for i = intermission, 0, -1 do
-				local playerCount = #Players:GetPlayers()
-				status.Value = "Game will start in " .. i .. " seconds. Players: " .. playerCount .. "/15"
+				status.Value = "Game will start in " .. i .. " seconds. Need 2 or more players"
 				task.wait(1)
 			end
 
@@ -507,7 +517,6 @@ local function round()
 
 		-- intermission이 끝나면 팀 배정
 		status.Value = "Selecting Killer..."
-		local selectedPlayer, plrIcon
 		_G.pickRandomPlayer()
 		task.wait(3.5)
 

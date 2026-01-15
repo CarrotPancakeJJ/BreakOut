@@ -1,87 +1,118 @@
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
+local lobbyObjects = workspace:WaitForChild("LobbyObjects")
+local happyBall = lobbyObjects:WaitForChild("HappyBall")
+local howtoplay = lobbyObjects:WaitForChild("HowToPlay")
+local outField = lobbyObjects:WaitForChild("OutField")
+-- HappyBall 안의 사운드
+local oofSound = happyBall:WaitForChild("OOF")
 
--- 1. 오브젝트 참조 (경로가 정확해야 합니다)
-local lobbyObjects = Workspace:WaitForChild("LobbyObjects")
-local outField = lobbyObjects:WaitForChild("OutField") -- 대소문자 주의
+-- 쿨타임
+local playerCooldowns = {}
+local happyBallTeleportCooldown = false
+local happyBallSoundCooldown = false
+local howtoplayTeleportCooldown = false
 
--- 로비 스폰 찾기 (기존 코드 로직 참고하여 안전하게 찾기)
--- LobbySpawn 목록 가져오기 함수
-local function getLobbySpawns()
-	local lobbySpawns = {}
+------------------------------------------------
+-- 로비 스폰 랜덤
+------------------------------------------------
+local function getRandomLobbySpawn()
+	local spawnsFolder = lobbyObjects:WaitForChild("LobbySpawns")
+	local spawns = spawnsFolder:GetChildren()
 
-	-- 방법 1: "LobbySpawn"으로 시작하는 모든 파트 찾기
-	for _, obj in pairs(workspace:GetChildren()) do
-		if obj:IsA("BasePart") and obj.Name:match("^LobbySpawn") then
-			table.insert(lobbySpawns, obj)
-		end
+	if #spawns == 0 then
+		return nil
 	end
 
-	-- 방법 2: GameObjects 폴더 안에서 "LobbySpawn"으로 시작하는 파트만 찾기
-	local lobbySpawnsFolder = lobbyObjects:FindFirstChild("LobbySpawns")
-	if lobbySpawnsFolder then
-		for _, obj in pairs(lobbySpawnsFolder:GetChildren()) do
-			if obj:IsA("BasePart") and obj.Name:match("^LobbySpawn") then
-				table.insert(lobbySpawns, obj)
+	return spawns[math.random(1, #spawns)]
+end
+
+------------------------------------------------
+-- 텔레포트 함수
+------------------------------------------------
+local function teleportToLobby(part)
+	if not part or not part:IsA("BasePart") then
+		return
+	end
+
+	local lobbySpawn = getRandomLobbySpawn()
+	if not lobbySpawn then
+		warn("LobbySpawn을 찾을 수 없습니다!")
+		return
+	end
+
+	part.Velocity = Vector3.zero
+	part.AssemblyLinearVelocity = Vector3.zero
+	part.CFrame = lobbySpawn.CFrame + Vector3.new(0, 3, 0)
+end
+
+------------------------------------------------
+-- OutField 충돌 처리
+------------------------------------------------
+outField.Touched:Connect(function(hit)
+	local character = hit.Parent
+
+	-- 플레이어
+	if character then
+		local player = Players:GetPlayerFromCharacter(character)
+		if player and character:FindFirstChild("HumanoidRootPart") then
+			if not playerCooldowns[player.UserId] then
+				playerCooldowns[player.UserId] = true
+				teleportToLobby(character.HumanoidRootPart)
+
+				task.delay(0.1, function()
+					playerCooldowns[player.UserId] = nil
+				end)
 			end
 		end
 	end
 
-	return lobbySpawns
-end
+	-- HappyBall
+	if hit == happyBall then
+		if not happyBallTeleportCooldown then
+			happyBallTeleportCooldown = true
+			teleportToLobby(happyBall)
 
--- 랜덤 LobbySpawn 선택 함수
-local function getRandomLobbySpawn()
-	local lobbySpawns = getLobbySpawns()
-
-	if #lobbySpawns == 0 then
-		warn("LobbySpawn을 찾을 수 없습니다. 기본 LobbySpawn을 사용합니다.")
-		local defaultSpawn = workspace:FindFirstChild("LobbySpawn")
-		if defaultSpawn and defaultSpawn:IsA("BasePart") then
-			return defaultSpawn
+			task.delay(0.1, function()
+				happyBallTeleportCooldown = false
+			end)
 		end
-		return nil
 	end
 
-	-- 랜덤하게 하나 선택
-	local randomIndex = math.random(1, #lobbySpawns)
-	return lobbySpawns[randomIndex]
-end
+	-- HappyBall
+	if hit == howtoplay then
+		if not howtoplayTeleportCooldown then
+			howtoplayTeleportCooldown = true
+			teleportToLobby(howtoplay)
 
--- 디바운스 (연속 닿음 방지)
-local cooldowns = {}
+			task.delay(0.1, function()
+				howtoplayTeleportCooldown = false
+			end)
+		end
+	end
+end)
 
-outField.Touched:Connect(function(hit)
+------------------------------------------------
+-- HappyBall ↔ 플레이어 충돌 시 사운드 (3D)
+------------------------------------------------
+happyBall.Touched:Connect(function(hit)
 	local character = hit.Parent
-	local player = Players:GetPlayerFromCharacter(character)
-
-	-- 플레이어의 캐릭터인 경우에만 실행
-	if player and character:FindFirstChild("HumanoidRootPart") then
-		-- 쿨타임 체크 (이미 텔레포트 중이면 무시)
-		if cooldowns[player.UserId] then
-			return
-		end
-		cooldowns[player.UserId] = true
-
-		local hrp = character.HumanoidRootPart
-		local lobbySpawn = getRandomLobbySpawn()
-
-		if lobbySpawn then
-			-- 텔레포트 실행
-			-- 물리적 관성 제거 (미끄러짐 방지)
-			hrp.Velocity = Vector3.zero
-			hrp.AssemblyLinearVelocity = Vector3.zero
-
-			-- 위치 이동 (스폰 위치보다 3스터드 위로)
-			hrp.CFrame = lobbySpawn.CFrame + Vector3.new(0, 3, 0)
-
-			print(player.Name .. "님이 OutFiled에 닿아 로비로 복귀했습니다.")
-		else
-			warn("LobbySpawn을 찾을 수 없습니다!")
-		end
-
-		-- 1초 후 쿨타임 해제
-		task.wait(1)
-		cooldowns[player.UserId] = nil
+	if not character then
+		return
 	end
+
+	local player = Players:GetPlayerFromCharacter(character)
+	if not player then
+		return
+	end
+
+	if happyBallSoundCooldown then
+		return
+	end
+	happyBallSoundCooldown = true
+
+	oofSound:Play() -- 🔊 공 위치에서 3D 사운드 재생
+
+	task.delay(3, function()
+		happyBallSoundCooldown = false
+	end)
 end)

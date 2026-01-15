@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local lobbyTeam = Teams:FindFirstChild("Lobby")
 local InRound = ReplicatedStorage:WaitForChild("InRound")
 local IsRestrictMovement = ReplicatedStorage:WaitForChild("IsRestrictMovement")
+local event = ReplicatedStorage:WaitForChild("PlayDeathSound")
 
 -- LobbySpawn 찾기
 local function getRandomLobbySpawn()
@@ -48,6 +49,7 @@ Players.PlayerAdded:Connect(function(player)
 
 		-- 죽었을 때
 		humanoid.Died:Connect(function()
+			event:FireAllClients()
 			-- Lobby 팀으로 변경
 			if lobbyTeam then
 				player.Team = lobbyTeam

@@ -1,6 +1,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService") -- [추가] 매 프레임 연산을 위해 필요
 local PhysicsService = game:GetService("PhysicsService")
+local soundService = game:GetService("SoundService")
+local BGMFolder = soundService:WaitForChild("BGM")
 
 -- 기존 RemoteEvent 및 변수 설정 유지
 local startEvent = ReplicatedStorage:FindFirstChild("StartGame")
@@ -144,6 +146,10 @@ local function createBall()
 				-- 천장: 무조건 아래로
 				direction = Vector3.new(direction.X, -math.abs(direction.Y), 0).Unit
 			elseif hitName == "Brick" then
+				local brickSound = BGMFolder:WaitForChild("break")
+				if brickSound then
+					brickSound:Play()
+				end
 				-- 벽돌 파괴
 				hitPart:Destroy()
 			end
