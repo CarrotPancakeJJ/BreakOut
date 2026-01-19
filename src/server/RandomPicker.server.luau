@@ -63,9 +63,9 @@ end
 -------------------------------------------------
 -- [Studio 테스트용] 구매 시뮬레이션
 -------------------------------------------------
-local simulatePurchaseEvent = getOrCreateEvent("SimulateKillerPurchase")
+local simulateKillerEvent = getOrCreateEvent("SimulateKillerPurchase")
 
-simulatePurchaseEvent.OnServerEvent:Connect(function(player)
+simulateKillerEvent.OnServerEvent:Connect(function(player)
 	print("=== [테스트] 구매 시뮬레이션:", player.Name, "===")
 
 	if currentKiller or rouletteStarted then
@@ -75,6 +75,7 @@ simulatePurchaseEvent.OnServerEvent:Connect(function(player)
 		return
 	end
 
+	_G.processKillerPurchase()
 	print("=== [테스트] 구매 성공! " .. player.Name .. " 이 킬러로 설정됨 ===")
 	currentKiller = player
 	currentKillerUserId = player.UserId
