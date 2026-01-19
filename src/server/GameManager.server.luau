@@ -45,6 +45,7 @@ local function createBricks()
 			local brick = Instance.new("Part")
 			brick.Size = brickSize
 			brick.Anchored = true
+			brick.CastShadow = false
 			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
 			brick.Name = "Brick"

@@ -2,7 +2,13 @@ local Players = game:GetService("Players")
 local lobbyObjects = workspace:WaitForChild("LobbyObjects")
 local happyBall = lobbyObjects:WaitForChild("HappyBall")
 local howtoplay = lobbyObjects:WaitForChild("HowToPlay")
+local soccerBall = lobbyObjects:WaitForChild("SoccerBall")
+local soccerGoal1 = lobbyObjects:WaitForChild("SoccerGoal1")
+local soccerGoal2 = lobbyObjects:WaitForChild("SoccerGoal2")
 local outField = lobbyObjects:WaitForChild("OutField")
+
+local soundService = game:GetService("SoundService")
+local goalFolder = soundService:WaitForChild("GOAL")
 -- HappyBall 안의 사운드
 local oofSound = happyBall:WaitForChild("OOF")
 
@@ -11,6 +17,7 @@ local playerCooldowns = {}
 local happyBallTeleportCooldown = false
 local happyBallSoundCooldown = false
 local howtoplayTeleportCooldown = false
+local soccerBallTeleportCooldown = false
 
 ------------------------------------------------
 -- 로비 스폰 랜덤
@@ -78,7 +85,7 @@ outField.Touched:Connect(function(hit)
 		end
 	end
 
-	-- HappyBall
+	-- HowToPlay
 	if hit == howtoplay then
 		if not howtoplayTeleportCooldown then
 			howtoplayTeleportCooldown = true
@@ -86,6 +93,18 @@ outField.Touched:Connect(function(hit)
 
 			task.delay(0.1, function()
 				howtoplayTeleportCooldown = false
+			end)
+		end
+	end
+
+	-- SoccerBall
+	if hit == soccerBall then
+		if not soccerBallTeleportCooldown then
+			soccerBallTeleportCooldown = true
+			teleportToLobby(soccerBall)
+
+			task.delay(0.1, function()
+				soccerBallTeleportCooldown = false
 			end)
 		end
 	end
@@ -115,4 +134,41 @@ happyBall.Touched:Connect(function(hit)
 	task.delay(3, function()
 		happyBallSoundCooldown = false
 	end)
+end)
+
+-- 랜덤 사망 사운드 재생 함수
+local function playRandomGoalSound()
+	local goalSounds = {}
+
+	for _, sound in pairs(goalFolder:GetChildren()) do
+		if sound:IsA("Sound") then
+			table.insert(goalSounds, sound)
+		end
+	end
+
+	if #goalSounds == 0 then
+		warn("GOAL 폴더에 사운드가 없습니다!")
+		return
+	end
+
+	local selectedSound = goalSounds[math.random(#goalSounds)]
+	selectedSound:Play()
+
+	print("골 사운드 재생:", selectedSound.Name)
+end
+
+soccerBall.Touched:Connect(function(hit)
+	-- SoccerBall
+	if hit:IsDescendantOf(soccerGoal1) or hit:IsDescendantOf(soccerGoal2) then
+		print("어 축구공 맞아")
+		if not soccerBallTeleportCooldown then
+			soccerBallTeleportCooldown = true
+			playRandomGoalSound()
+			teleportToLobby(soccerBall)
+
+			task.delay(1, function()
+				soccerBallTeleportCooldown = false
+			end)
+		end
+	end
 end)
