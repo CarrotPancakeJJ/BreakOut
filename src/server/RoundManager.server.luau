@@ -1,9 +1,9 @@
 local intermission = 30
-local roundLength = 100
+local roundLength = 110
 
 local InRound = game.ReplicatedStorage.InRound
 local status = game.ReplicatedStorage.Status
-local IsRestrictMovement = game.ReplicatedStorage.IsRestrictMovement -- 추가
+local IsRestrictMovement = game.ReplicatedStorage.IsRestrictMovement
 local soundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 
@@ -12,6 +12,8 @@ local cameraPart = gameObjects and gameObjects:FindFirstChild("CameraPart")
 
 local Teams = game:GetService("Teams")
 local gameEnded = false
+
+local Winner = game.ReplicatedStorage:WaitForChild("Winner")
 
 -- 현재 재생 중인 음악 추적
 local currentMusic = nil
@@ -26,7 +28,7 @@ local gameObjectsFolder = workspace:FindFirstChild("GameObjects")
 if gameObjectsFolder then
 	originalStartGameWall = gameObjectsFolder:FindFirstChild("StartGameWall")
 	if originalStartGameWall then
-		originalStartGameWall = originalStartGameWall:Clone() -- 복사본 저장
+		originalStartGameWall = originalStartGameWall:Clone()
 	end
 end
 
@@ -39,13 +41,11 @@ local function createStartGameWall()
 
 	local gameObjectsFolder = workspace:FindFirstChild("GameObjects")
 	if gameObjectsFolder then
-		-- 기존 벽 제거
 		local existingWall = gameObjectsFolder:FindFirstChild("StartGameWall")
 		if existingWall then
 			existingWall:Destroy()
 		end
 
-		-- 새 벽 생성
 		local newWall = originalStartGameWall:Clone()
 		newWall.Parent = gameObjectsFolder
 		print("StartGameWall이 생성되었습니다.")
@@ -56,16 +56,14 @@ end
 local function getMapSpawns()
 	local mapSpawns = {}
 
-	-- 방법 1: "MapSpawn"으로 시작하는 모든 파트 찾기
 	for _, obj in pairs(workspace:GetChildren()) do
 		if obj:IsA("BasePart") and obj.Name:match("^MapSpawn") then
 			table.insert(mapSpawns, obj)
 		end
 	end
 
-	-- 방법 2: GameObjects 폴더 안에서 "MapSpawn"으로 시작하는 파트만 찾기
 	local gameObjectsFolder = workspace:FindFirstChild("GameObjects")
-	local mapSpawnsFolder = gameObjectsFolder:FindFirstChild("MapSpawns")
+	local mapSpawnsFolder = gameObjectsFolder and gameObjectsFolder:FindFirstChild("MapSpawns")
 	if mapSpawnsFolder then
 		for _, obj in pairs(mapSpawnsFolder:GetChildren()) do
 			if obj:IsA("BasePart") and obj.Name:match("^MapSpawn") then
@@ -90,7 +88,6 @@ local function getRandomMapSpawn()
 		return nil
 	end
 
-	-- 랜덤하게 하나 선택
 	local randomIndex = math.random(1, #mapSpawns)
 	return mapSpawns[randomIndex]
 end
@@ -99,16 +96,14 @@ end
 local function getLobbySpawns()
 	local lobbySpawns = {}
 
-	-- 방법 1: "LobbySpawn"으로 시작하는 모든 파트 찾기
 	for _, obj in pairs(workspace:GetChildren()) do
 		if obj:IsA("BasePart") and obj.Name:match("^LobbySpawn") then
 			table.insert(lobbySpawns, obj)
 		end
 	end
 
-	-- 방법 2: GameObjects 폴더 안에서 "LobbySpawn"으로 시작하는 파트만 찾기
 	local lobbyObjectsFolder = workspace:FindFirstChild("LobbyObjects")
-	local lobbySpawnsFolder = lobbyObjectsFolder:FindFirstChild("LobbySpawns")
+	local lobbySpawnsFolder = lobbyObjectsFolder and lobbyObjectsFolder:FindFirstChild("LobbySpawns")
 	if lobbySpawnsFolder then
 		for _, obj in pairs(lobbySpawnsFolder:GetChildren()) do
 			if obj:IsA("BasePart") and obj.Name:match("^LobbySpawn") then
@@ -133,7 +128,6 @@ local function getRandomLobbySpawn()
 		return nil
 	end
 
-	-- 랜덤하게 하나 선택
 	local randomIndex = math.random(1, #lobbySpawns)
 	return lobbySpawns[randomIndex]
 end
@@ -141,12 +135,11 @@ end
 -- StartGameWall 제거 함수
 local function removeStartGameWall()
 	local gameObjectsFolder = workspace:FindFirstChild("GameObjects")
-	local startGameWall = gameObjectsFolder:WaitForChild("StartGameWall")
+	local startGameWall = gameObjectsFolder and gameObjectsFolder:WaitForChild("StartGameWall")
 	if startGameWall then
 		startGameWall:Destroy()
 		print("StartGameWall이 제거되었습니다.")
 	else
-		-- StartGameWall 폴더나 모델일 수도 있음
 		local startGameWallFolder = workspace:FindFirstChild("StartGameWall")
 		if startGameWallFolder then
 			startGameWallFolder:Destroy()
@@ -157,13 +150,11 @@ end
 
 -- 현재 음악 정지 함수
 local function stopCurrentMusic()
-	-- 1. 기존에 연결된 "다음 곡 재생 예약"이 있다면 해제
 	if musicConnection then
 		musicConnection:Disconnect()
 		musicConnection = nil
 	end
 
-	-- 2. 현재 음악 정지
 	if currentMusic then
 		currentMusic:Stop()
 		currentMusic = nil
@@ -192,12 +183,10 @@ local function playLobbyMusic()
 		return
 	end
 
-	-- 랜덤으로 하나 선택하여 재생
 	local randomIndex = math.random(1, #musicTracks)
 	currentMusic = musicTracks[randomIndex]
 	currentMusic:Play()
 
-	-- 노래가 끝나면 다시 이 함수를 실행해서 무한 반복
 	musicConnection = currentMusic.Ended:Connect(function()
 		playLobbyMusic()
 	end)
@@ -226,12 +215,10 @@ local function playGameMusic()
 		return
 	end
 
-	-- 랜덤으로 하나 선택하여 재생
 	local randomIndex = math.random(1, #musicTracks)
 	currentMusic = musicTracks[randomIndex]
 	currentMusic:Play()
 
-	-- 노래가 끝나면 다시 이 함수를 실행해서 무한 반복
 	musicConnection = currentMusic.Ended:Connect(function()
 		playGameMusic()
 	end)
@@ -244,7 +231,6 @@ local function makePlayerInvisible(character)
 		if part:IsA("BasePart") then
 			part.Transparency = 1
 		else
-			-- Decal, Texture 등 다른 것들
 			pcall(function()
 				if part.Transparency then
 					part.Transparency = 1
@@ -265,7 +251,6 @@ local function makePlayerVisible(character)
 				part.Transparency = 0
 			end
 		else
-			-- Decal, Texture 등 다른 것들
 			pcall(function()
 				if part.Transparency then
 					part.Transparency = 0
@@ -304,11 +289,15 @@ local function handleVictory(winningTeam)
 
 	local teamName = winningTeam.Name
 
-	-- 승리 메시지 표시
+	if teamName == "Killer" then
+		Winner.Value = "Killer"
+	else
+		Winner.Value = "Player"
+	end
+
 	if teamName == "Killer" then
 		status.Value = "🔪 KILLER WINS! 🔪"
 
-		-- Killer 팀 플레이어들의 Killer Wins 증가
 		for _, player in pairs(Players:GetPlayers()) do
 			if player.Team == winningTeam then
 				local leaderstats = player:FindFirstChild("leaderstats")
@@ -320,10 +309,9 @@ local function handleVictory(winningTeam)
 				end
 			end
 		end
-	else -- Player 팀 승리
+	else
 		status.Value = "🎉 PLAYERS WIN! 🎉"
 
-		-- Player 팀 플레이어들의 Player Wins 증가
 		for _, player in pairs(Players:GetPlayers()) do
 			if player.Team == winningTeam then
 				local leaderstats = player:FindFirstChild("leaderstats")
@@ -339,10 +327,8 @@ local function handleVictory(winningTeam)
 
 	print(teamName .. " 팀 승리!")
 
-	-- 5초 대기
 	task.wait(5)
 
-	-- 로비로 이동
 	local lobbyTeam = Teams:FindFirstChild("Lobby")
 	for _, plr in pairs(Players:GetPlayers()) do
 		local randomLobbySpawn = getRandomLobbySpawn()
@@ -354,59 +340,54 @@ local function handleVictory(winningTeam)
 				humanRoot.Anchored = false
 			end
 
-			-- 다시 보이게 만들기
 			makePlayerVisible(char)
 		end
 
-		-- Lobby 팀으로 변경
 		if lobbyTeam then
 			plr.Team = lobbyTeam
 			plr.TeamColor = lobbyTeam.TeamColor
 		end
 	end
 
-	-- 로비 음악 재생
+	Winner.Value = "None"
 	playLobbyMusic()
 end
 
 InRound.Changed:Connect(function()
-	-- 게임이 종료되면 공과 벽돌 삭제
 	if InRound.Value == false then
 		if _G.cleanupGame then
 			_G.cleanupGame()
 		end
 	end
+
+	if gameEnded then
+		if _G.resetKillerSelection then
+			_G.resetKillerSelection()
+		end
+	end
+
 	if InRound.Value == false and not gameEnded then
-		-- 팀들
 		local Teams = game:GetService("Teams")
 		local lobbyTeam = Teams:FindFirstChild("Lobby")
 
-		-- 이동 제한 해제
 		IsRestrictMovement.Value = false
 
-		-- 라운드가 끝나면 로비로 텔레포트 + Lobby 팀으로 변경
 		for i, plr in pairs(game.Players:GetChildren()) do
 			local randomLobbySpawn = getRandomLobbySpawn()
 			local char = plr.Character
 			if char then
 				local humanRoot = char:WaitForChild("HumanoidRootPart")
 				humanRoot.CFrame = randomLobbySpawn.CFrame
-
-				-- Anchored 해제
 				humanRoot.Anchored = false
-
-				-- 다시 보이게 만들기
 				makePlayerVisible(char)
 			end
 
-			-- Lobby 팀으로 리셋
 			if lobbyTeam then
 				plr.Team = lobbyTeam
 				plr.TeamColor = lobbyTeam.TeamColor
 			end
 		end
 
-		-- 로비 음악 재생
 		playLobbyMusic()
 	end
 end)
@@ -421,21 +402,17 @@ local function teleportPlayersByTeam()
 		warn("CameraPart를 찾을 수 없습니다!")
 	end
 
-	-- [중요] 기존에 여기 있던 randomMapSpawn 설정을 삭제합니다.
-
 	for _, plr in pairs(game.Players:GetPlayers()) do
 		local char = plr.Character
 		if char then
 			local humanRoot = char:FindFirstChild("HumanoidRootPart")
 			if humanRoot then
 				if plr.Team == killerTeam and cameraPart then
-					-- Killer 처리 (항상 CameraPart 위치)
 					humanRoot.CFrame = cameraPart.CFrame
 					humanRoot.Anchored = true
 					makePlayerInvisible(char)
 					print(plr.Name .. " (Killer) - CameraPart로 텔레포트")
 				elseif plr.Team == playerTeam then
-					-- [수정 부분] 여기서 플레이어마다 각각 랜덤 위치를 새로 뽑습니다.
 					local randomMapSpawn = getRandomMapSpawn()
 
 					if randomMapSpawn then
@@ -451,6 +428,7 @@ local function teleportPlayersByTeam()
 		end
 	end
 end
+
 local function isKillerAlive()
 	local killerTeam = Teams:FindFirstChild("Killer")
 	if not killerTeam then
@@ -475,78 +453,52 @@ end
 local function round()
 	while true do
 		InRound.Value = false
-		IsRestrictMovement.Value = false -- 추가
+		IsRestrictMovement.Value = false
 		gameEnded = false
 
 		repeat
 			for i = intermission, 0, -1 do
-				local playerCount = #Players:GetPlayers()
-				status.Value = "Game will start in "
-					.. i
-					.. " seconds\nMinimum 2 players to start!\nPlayers: "
-					.. playerCount
-					.. "/15: "
+				status.Value = "Game will start in " .. i .. " seconds. Need 2 or more players"
 				task.wait(1)
 			end
 
-			-- 플레이어 수 확인
 			local playerCount = #Players:GetPlayers()
 			if playerCount < 2 then
-				status.Value = "Not enough players! Waiting...\nPlayers: " .. playerCount .. "/15"
+				status.Value = "Not enough players! Waiting..."
 				task.wait(2)
 			end
 		until #Players:GetPlayers() >= 2
 
-		-- intermission이 끝나면 팀 배정
 		status.Value = "Selecting Killer..."
-		local selectedPlayer, plrIcon
-		if _G.pickRandomPlayer then
-			selectedPlayer, plrIcon = _G.pickRandomPlayer() -- 반환값 받기
-		end
+		_G.pickRandomPlayer()
+		task.wait(3.5)
 
-		if selectedPlayer then
-			status.Value = "Killer is: " .. selectedPlayer.Name .. "!"
-		else
-			status.Value = "Killer selected!"
-		end
-		task.wait(2)
-
-		-- 그 다음 MapSpawn으로 텔레포트
 		status.Value = "Teleporting to map..."
 		teleportPlayersByTeam()
 
-		-- 텔레포트 직후 이동 제한 시작! (중요)
 		IsRestrictMovement.Value = true
 
-		-- 텔레포트 직후 게임 음악 재생
 		playGameMusic()
 
-		-- 텔레포트 후 블럭 생성
 		if _G.createBricks then
 			_G.createBricks()
 		end
 
-		-- StartGameWall 생성
 		createStartGameWall()
 
-		-- 5초 대기
-		for i = 5, 0, -1 do
+		for i = 10, 0, -1 do
 			status.Value = "Game starting in " .. i .. " seconds"
 			task.wait(1)
 		end
 
-		-- StartGameWall 제거
 		removeStartGameWall()
 
-		-- 그 다음 InRound를 true로 설정
 		InRound.Value = true
 
-		-- InRound가 true가 되면 공 생성
 		if _G.createBall then
 			_G.createBall()
 		end
 
-		-- 게임 진행 (승패 조건 체크)
 		local killerTeam = Teams:FindFirstChild("Killer")
 		local playerTeam = Teams:FindFirstChild("Player")
 
@@ -555,7 +507,6 @@ local function round()
 				break
 			end
 
-			-- Killer 중도 퇴장 / 사망 체크
 			if not isKillerAlive() then
 				status.Value = "Killer has left the game!"
 				task.wait(2)
@@ -565,11 +516,9 @@ local function round()
 				break
 			end
 
-			-- 생존자 체크
 			local alivePlayers = getAlivePlayers()
 
 			if #alivePlayers == 0 then
-				-- 모든 Player가 죽음 → Killer 승리
 				status.Value = "All players eliminated!"
 				task.wait(2)
 				handleVictory(killerTeam)
@@ -580,7 +529,6 @@ local function round()
 			task.wait(1)
 		end
 
-		-- 시간 초과 → Player 승리
 		if not gameEnded then
 			local alivePlayers = getAlivePlayers()
 			if #alivePlayers > 0 then
@@ -590,11 +538,15 @@ local function round()
 			end
 		end
 
-		task.wait(3) -- 다음 라운드 전 대기
+		task.wait(3)
 	end
 end
 
 -- 게임 시작 시 로비 음악 재생
 playLobbyMusic()
+
+-- 부활 관련 함수를 _G에 export (Marketplace 스크립트에서 사용)
+_G.getRandomMapSpawn = getRandomMapSpawn
+_G.makePlayerVisible = makePlayerVisible
 
 task.spawn(round)

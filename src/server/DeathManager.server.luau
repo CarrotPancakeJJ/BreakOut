@@ -5,7 +5,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- 게임 종료 플래그 추가
 local lobbyTeam = Teams:FindFirstChild("Lobby")
 local InRound = ReplicatedStorage:WaitForChild("InRound")
+local Status = ReplicatedStorage:WaitForChild("Status")
+local Inform = ReplicatedStorage:WaitForChild("Inform")
 local IsRestrictMovement = ReplicatedStorage:WaitForChild("IsRestrictMovement")
+local event = ReplicatedStorage:WaitForChild("PlayDeathSound")
 
 -- LobbySpawn 찾기
 local function getRandomLobbySpawn()
@@ -48,6 +51,12 @@ Players.PlayerAdded:Connect(function(player)
 
 		-- 죽었을 때
 		humanoid.Died:Connect(function()
+			event:FireAllClients()
+
+			if InRound.Value and player.Team and player.Team.Name == "Player" then
+				-- 탈락 메시지 표시
+				Inform.Value = "💀 " .. player.Name .. " Eliminated!"
+			end
 			-- Lobby 팀으로 변경
 			if lobbyTeam then
 				player.Team = lobbyTeam

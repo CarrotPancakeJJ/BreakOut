@@ -1,7 +1,10 @@
--- BrickBreakerServer.lua
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- [추가] 매 프레임 연산을 위해 필요
+local PhysicsService = game:GetService("PhysicsService")
+local soundService = game:GetService("SoundService")
+local BGMFolder = soundService:WaitForChild("BGM")
 
--- RemoteEvent 준비
+-- 기존 RemoteEvent 및 변수 설정 유지
 local startEvent = ReplicatedStorage:FindFirstChild("StartGame")
 if not startEvent then
 	startEvent = Instance.new("RemoteEvent")
@@ -9,30 +12,10 @@ if not startEvent then
 	startEvent.Parent = ReplicatedStorage
 end
 
-local INITIAL_SPEED = 30 -- 게임 시작 시 초기 속도
-local SPEED_INCREMENT = 5 -- 패들에 닿을 때마다 증가할 속도량
-local currentSpeed = INITIAL_SPEED -- 현재 공의 속도를 추적하는 변수
+local INITIAL_SPEED = 30
+local SPEED_INCREMENT = 5
+local currentSpeed = INITIAL_SPEED
 
-local PhysicsService = game:GetService("PhysicsService")
-
--- 그룹 이름 정의
-local ballGroup = "Balls"
-local wallGroup = "SpecialWalls"
-
--- 그룹 생성 (이미 존재하면 무시)
-pcall(function()
-	PhysicsService:CreateCollisionGroup(ballGroup)
-end)
-pcall(function()
-	PhysicsService:CreateCollisionGroup(wallGroup)
-end)
-
--- 관계 설정: 공과 특수벽은 서로 충돌함
-PhysicsService:CollisionGroupSetCollidable(ballGroup, wallGroup, true)
--- 관계 설정: 플레이어(Default)와 특수벽은 서로 통과함 (이게 핵심!)
-PhysicsService:CollisionGroupSetCollidable("Default", wallGroup, false)
-
--- 색상 후보
 local colors = {
 	Color3.fromRGB(255, 0, 0),
 	Color3.fromRGB(0, 255, 0),
@@ -42,7 +25,7 @@ local colors = {
 	Color3.fromRGB(128, 0, 128),
 }
 
--- 벽돌 생성 함수
+-- [벽돌 생성 함수 유지]
 local function createBricks()
 	local bricksFolder = workspace:FindFirstChild("Bricks")
 	if bricksFolder then
@@ -55,13 +38,14 @@ local function createBricks()
 
 	local startX = -20
 	local startY = 50
-	local brickSize = Vector3.new(8, 4, 4)
+	local brickSize = Vector3.new(8, 4, 15)
 
 	for row = 1, 7 do
 		for col = 1, 12 do
 			local brick = Instance.new("Part")
 			brick.Size = brickSize
 			brick.Anchored = true
+			brick.CastShadow = false
 			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
 			brick.Name = "Brick"
@@ -70,147 +54,145 @@ local function createBricks()
 	end
 end
 
--- 충돌 면의 법선 벡터(Normal)를 구하는 함수
-local function getNormal(ballPos, hitPart)
-	local hitPos = hitPart.Position
-	local hitSize = hitPart.Size
+-------------------------------------------------------------
+-- [핵심 변경] Raycasting 기반 공 생성 및 이동 함수
+-------------------------------------------------------------
+local activeBallLoop = nil -- 루프 제어용 변수
 
-	local dx = (ballPos.X - hitPos.X) / (hitSize.X / 2)
-	local dy = (ballPos.Y - hitPos.Y) / (hitSize.Y / 2)
-
-	-- 가장 멀리 떨어진 축의 방향을 법선 벡터로 설정
-	if math.abs(dx) > math.abs(dy) then
-		return Vector3.new(math.sign(dx), 0, 0) -- 좌우면 (X축 법선)
-	else
-		return Vector3.new(0, math.sign(dy), 0) -- 위아래면 (Y축 법선)
-	end
-end
-
--- 공 생성 함수
 local function createBall()
-	-- 이전 볼 제거 로직
+	-- 1. 기존 공 및 루프 정리
+	if activeBallLoop then
+		activeBallLoop:Disconnect()
+		activeBallLoop = nil
+	end
 	local oldBall = workspace:FindFirstChild("Ball")
 	if oldBall then
 		oldBall:Destroy()
 	end
 
+	-- 2. 공 생성 (Anchored = true로 설정하여 물리 엔진 영향 제거)
 	local ball = Instance.new("Part")
-	ball.CollisionGroupId = PhysicsService:GetCollisionGroupId(ballGroup)
+	ball.Name = "Ball"
 	ball.Shape = Enum.PartType.Ball
 	ball.Size = Vector3.new(2, 2, 2)
 	ball.Position = Vector3.new(0, 5, 0)
-	ball.Anchored = false
-	ball.CanCollide = true
-	ball.BrickColor = BrickColor.new("White")
-	ball.Name = "Ball"
-	ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 1, 100, 100)
-
-	-- 초기 속도 설정
-	currentSpeed = INITIAL_SPEED
-
-	local bv = Instance.new("BodyVelocity")
-	-- 초기 방향 (약간의 각도를 주어 시작)
-	bv.Velocity = Vector3.new(INITIAL_SPEED, INITIAL_SPEED, 0).Unit * currentSpeed
-	bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-	bv.Parent = ball
-
+	ball.Color = Color3.new(1, 0.615686, 0)
+	ball.Material = Enum.Material.Neon
+	ball.Anchored = true -- [중요] 물리 엔진이 아닌 스크립트로만 이동
+	ball.CanCollide = false -- Raycast로 처리하므로 충돌 판정 불필요
 	ball.Parent = workspace
 
-	local canBounce = true
+	-- 3. 초기 속도 및 방향 설정
+	currentSpeed = INITIAL_SPEED
+	local direction = Vector3.new(1, 1, 0).Unit -- 초기 발사 방향
 
-	ball.Touched:Connect(function(hit)
-		if not canBounce or not hit or hit.CanCollide == false then
+	-- 레이캐스트 파라미터 (공 자신은 무시)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = { ball }
+
+	-- 4. 매 프레임 이동 로직 (Heartbeat)
+	activeBallLoop = RunService.Heartbeat:Connect(function(dt)
+		if not ball or not ball.Parent then
+			if activeBallLoop then
+				activeBallLoop:Disconnect()
+			end
 			return
 		end
 
-		local hitName = hit.Name
-		canBounce = false
+		-- 이번 프레임에 이동할 거리 계산
+		local stepDistance = currentSpeed * dt
+		local origin = ball.Position
+		local targetPosition = origin + (direction * stepDistance)
 
-		-- 0. 플레이어 캐릭터인지 확인
-		local character = hit.Parent
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		-- 가려는 경로에 장애물이 있는지 레이저 발사
+		local rayResult = workspace:Raycast(origin, direction * stepDistance, rayParams)
 
-		if humanoid and humanoid.Health > 0 then
-			-- 플레이어가 공에 닿으면 즉시 사망
-			humanoid.Health = 0
-			print(character.Name .. " 플레이어가 공에 부딪혀 사망했습니다!")
-			return -- 플레이어와 부딪혔을 때는 튕김 로직을 건너뛰고 싶다면 return 사용
-		end
+		if rayResult then
+			-- [충돌 발생!]
+			local hitPart = rayResult.Instance
+			local hitName = hitPart.Name
+			local normal = rayResult.Normal -- 충돌 면의 법선 벡터
 
-		-- 1. 예외 처리: 좌우 벽
-		if hitName == "LeftWall" then
-			-- 무조건 오른쪽(+) 방향으로 속도 설정
-			bv.Velocity = Vector3.new(math.abs(bv.Velocity.X), bv.Velocity.Y, 0)
-		elseif hitName == "RightWall" then
-			-- 무조건 왼쪽(-) 방향으로 속도 설정
-			bv.Velocity = Vector3.new(-math.abs(bv.Velocity.X), bv.Velocity.Y, 0)
-		elseif hitName == "TopWall" then
-			-- 확실하게 아래 방향으로 튕기도록 math.abs 사용
-			bv.Velocity = Vector3.new(bv.Velocity.X, -math.abs(bv.Velocity.Y), 0)
-			print("천장 충돌 (플레이어는 통과 가능)")
+			-- 0. 플레이어 충돌 체크
+			local character = hitPart.Parent
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid and humanoid.Health > 0 then
+				humanoid.Health = 0
+				return -- 플레이어 사망 시 튕김 로직 무시 가능
+			end
 
-		-- 2. 패들: 각도 조절 + 속도 0.2 증가
-		elseif hitName == "Paddle" then
-			-- 속도 증가
-			currentSpeed = currentSpeed + SPEED_INCREMENT
-			print("공 속도 증가! 현재 속도:", currentSpeed)
+			-- 1. 반사 벡터 계산 (기본 물리 반사 공식: V - 2(V내적N)N)
+			local reflect = direction - (2 * direction:Dot(normal) * normal)
+			direction = reflect -- 기본적으로 반사된 방향을 가짐
 
-			local hitOffset = (ball.Position.X - hit.Position.X) / (hit.Size.X / 2)
-			local newDirection = Vector3.new(hitOffset * 1.5, 1, 0).Unit
-			bv.Velocity = newDirection * currentSpeed -- 증가된 속도 적용
+			-- 2. 특수 충돌 처리
+			if hitName == "Paddle" then
+				-- 패들: 속도 증가 및 각도 조절
+				currentSpeed = currentSpeed + SPEED_INCREMENT
+				local hitOffset = (ball.Position.X - hitPart.Position.X) / (hitPart.Size.X / 2)
+				-- 패들 중심에서 멀수록 휘어지게 설정
+				direction = Vector3.new(hitOffset * 1.5, 1, 0).Unit
+			elseif hitName == "DeathFloor" then
+				-- 바닥: 초기화 (튕겨 올라가게 처리)
+				currentSpeed = INITIAL_SPEED
+				direction = Vector3.new(direction.X, math.abs(direction.Y), 0).Unit
+			elseif hitName == "LeftWall" then
+				-- 왼쪽 벽: 무조건 오른쪽으로
+				direction = Vector3.new(math.abs(direction.X), direction.Y, 0).Unit
+			elseif hitName == "RightWall" then
+				-- 오른쪽 벽: 무조건 왼쪽으로
+				direction = Vector3.new(-math.abs(direction.X), direction.Y, 0).Unit
+			elseif hitName == "TopWall" then
+				-- 천장: 무조건 아래로
+				direction = Vector3.new(direction.X, -math.abs(direction.Y), 0).Unit
+			elseif hitName == "Brick" then
+				local brickSound = BGMFolder:WaitForChild("break")
+				if brickSound then
+					brickSound:Play()
+				end
+				-- 벽돌 파괴
+				hitPart:Destroy()
+			end
 
-		-- 3. 데스 플로어: 속도 초기화
-		elseif hitName == "DeathFloor" then
-			currentSpeed = INITIAL_SPEED
-			print("공이 떨어졌습니다. 속도 초기화:", currentSpeed)
+			-- 3. [보정] Y축 속도가 너무 느리면 수평 이동 방지 (무한 루프 방지)
+			if math.abs(direction.Y) < 0.2 then
+				local newY = (direction.Y >= 0) and 0.5 or -0.5
+				direction = Vector3.new(direction.X, newY, 0).Unit
+			end
 
-			-- 필요하다면 여기서 공의 위치를 다시 리셋하는 로직을 넣을 수 있습니다.
-			-- 현재는 그냥 튕겨 올라가는 로직으로 처리 (반사각 적용)
-			bv.Velocity = Vector3.new(bv.Velocity.X, math.abs(bv.Velocity.Y), 0)
+			-- Z축 고정 (2D 게임이므로)
+			direction = Vector3.new(direction.X, direction.Y, 0).Unit
 
-		-- 4. 나머지 (벽돌, 천장 등)
+			-- 4. 공 위치 강제 조정 (벽에 끼임 방지)
+			-- 충돌 지점에서 법선 방향으로 살짝 띄워줌
+			ball.Position = rayResult.Position + (normal * 0.1)
 		else
-			local normal = getNormal(ball.Position, hit)
-			local reflectVelocity = bv.Velocity - 2 * bv.Velocity:Dot(normal) * normal
-			bv.Velocity = reflectVelocity.Unit * currentSpeed -- 현재 속력 유지하며 방향만 반사
-
-			if hitName == "Brick" then
-				hit:Destroy()
-			end
+			-- [충돌 없음] 그냥 이동
+			ball.Position = targetPosition
 		end
-
-		-- [보정] Y축 최소 속도 유지
-		if math.abs(bv.Velocity.Y) < (currentSpeed * 0.3) then
-			local newY = math.sign(bv.Velocity.Y) * (currentSpeed * 0.5)
-			if newY == 0 then
-				newY = currentSpeed * 0.5
-			end
-			bv.Velocity = Vector3.new(bv.Velocity.X, newY, 0).Unit * currentSpeed
-		end
-
-		task.delay(0.05, function()
-			canBounce = true
-		end)
 	end)
 end
 
+-- 게임 정리 함수
 local function cleanupGame()
-	-- 1. 공 제거
+	if activeBallLoop then
+		activeBallLoop:Disconnect()
+		activeBallLoop = nil
+	end
+
 	local ball = workspace:FindFirstChild("Ball")
 	if ball then
 		ball:Destroy()
-		print("공이 제거되었습니다.")
 	end
 
-	-- 2. 벽돌 폴더 제거
 	local bricksFolder = workspace:FindFirstChild("Bricks")
 	if bricksFolder then
 		bricksFolder:Destroy()
-		print("벽돌 폴더가 제거되었습니다.")
 	end
 end
 
--- 전역 함수로 등록하여 RoundManager에서 사용할 수 있게 함
+-- 전역 등록
 _G.cleanupGame = cleanupGame
 _G.createBricks = createBricks
 _G.createBall = createBall
