@@ -13,8 +13,6 @@ local reservationKiller = {}
 
 local purchasingPlayer = nil
 
-local FORCE_KILLER_PRODUCT_ID = 3511107004
-
 -------------------------------------------------
 -- RemoteEvents
 -------------------------------------------------
@@ -59,32 +57,6 @@ local function showGuiForAll()
 	showGuiEvent:FireAllClients()
 	print("모든 플레이어의 구매 GUI 표시")
 end
-
--------------------------------------------------
--- [Studio 테스트용] 구매 시뮬레이션
--------------------------------------------------
-local simulateKillerEvent = getOrCreateEvent("SimulateKillerPurchase")
-
-simulateKillerEvent.OnServerEvent:Connect(function(player)
-	print("=== [테스트] 구매 시뮬레이션:", player.Name, "===")
-
-	if currentKiller or rouletteStarted then
-		print("늦은 구매 - 이미 킬러가 있음")
-		table.insert(reservationKiller, player)
-		purchasingPlayer = nil
-		return
-	end
-
-	_G.processKillerPurchase()
-	print("=== [테스트] 구매 성공! " .. player.Name .. " 이 킬러로 설정됨 ===")
-	currentKiller = player
-	currentKillerUserId = player.UserId
-	teamAssigned = false
-	purchasingPlayer = nil
-
-	hideGuiForAll()
-	print("=== [테스트] 구매 처리 완료 ===")
-end)
 
 -------------------------------------------------
 -- 아이콘 가져오기
@@ -134,11 +106,11 @@ requestPurchaseFunc.OnServerInvoke = function(player)
 
 	if currentKiller or purchasingPlayer then
 		if currentKillerUserId and player.UserId == currentKillerUserId then
-			return false, "이미 구매했습니다!"
+			return false, "Already purchased it!"
 		elseif purchasingPlayer and purchasingPlayer ~= player then
-			return false, "다른 사람이 구매 진행 중입니다!"
+			return false, "Someone else is buying it!"
 		else
-			return false, "이미 킬러가 선택되었습니다!"
+			return false, "The killer has already been chosen!"
 		end
 	end
 

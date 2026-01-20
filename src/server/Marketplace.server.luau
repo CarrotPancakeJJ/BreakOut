@@ -8,11 +8,27 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local soundService = game:GetService("SoundService")
 local BGMFolder = soundService:WaitForChild("BGM")
 local purchaseSound = BGMFolder:WaitForChild("Purchase")
+local donateSound = BGMFolder:WaitForChild("Donate")
 local reviveSound = BGMFolder:WaitForChild("Revive")
 
 -- 상품 ID 정의
 local REVIVE_PRODUCT_ID = 3516958082
 local FORCE_KILLER_PRODUCT_ID = 3511107004
+
+-- Donation 상품 ID와 금액 매핑
+local DONATION_PRODUCTS = {
+	[3498063120] = 10, -- 예시: 10 Robux 후원
+	[3498065337] = 20,
+	[3498065336] = 50,
+	[3498065350] = 100,
+	[3498065348] = 200,
+	[3498065328] = 500,
+	[3498065360] = 1000,
+	[3498065327] = 2000,
+	[3498065359] = 5000,
+	[3498065325] = 10000,
+	-- [상품ID] = 후원금액,
+}
 
 -- RemoteEvents 생성/가져오기
 local function getOrCreateEvent(name)
@@ -78,21 +94,13 @@ local function makePlayerVisible(character)
 	print(character.Name .. " 가시화 완료")
 end
 
--- 부활 처리 함수
-local function processRevive(player)
+local function processRevivePurchase(player)
 	local InRound = ReplicatedStorage:FindFirstChild("InRound")
 	local Status = ReplicatedStorage:FindFirstChild("Status")
-	local Inform = ReplicatedStorage:FindFirstChild("Inform")
 
 	-- 게임 종료 체크 (WINS 문자열 포함 여부)
 	local isGameOver = Status and string.find(string.upper(Status.Value), "WINS")
-
 	if InRound and InRound.Value == true and player.Team.Name == "Lobby" and not isGameOver then
-		-- 부활 시작 (죽음 무시 플래그 설정)
-		if _G.setPlayerReviving then
-			_G.setPlayerReviving(player.UserId, true)
-		end
-
 		player.Team = Teams:FindFirstChild("Player")
 		--player:LoadCharacter()
 
@@ -107,11 +115,15 @@ local function processRevive(player)
 		makePlayerVisible(char)
 		humanRoot.Anchored = false
 
-		-- 부활 완료 (죽음 무시 플래그 해제)
-		if _G.setPlayerReviving then
-			_G.setPlayerReviving(player.UserId, false)
-		end
-
+		return true
+	end
+	return false
+end
+-- 부활 처리 함수
+local function processRevive(player)
+	local success = processRevivePurchase(player)
+	local Inform = ReplicatedStorage:FindFirstChild("Inform")
+	if success then
 		if reviveSound then
 			reviveSound:Play()
 		end
@@ -120,10 +132,14 @@ local function processRevive(player)
 		if Inform then
 			Inform.Value = player.Name .. " has revived!"
 		end
+		print("=== 부활 구매 처리 완료: " .. player.Name .. " ===")
 
-		return true
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	else
+		-- 늦은 구매 (예약 처리됨)
+		print("늦은 구매 - 예약 처리됨: " .. player.Name)
+		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
-	return false
 end
 
 -- [Studio 테스트용] 부활 시뮬레이션 처리
@@ -184,6 +200,43 @@ simulateKillerEvent.OnServerEvent:Connect(function(player)
 	end
 end)
 
+-- Donation 처리 함수
+local function processDonation(player, receiptInfo)
+	local donationAmount = DONATION_PRODUCTS[receiptInfo.ProductId]
+
+	if not donationAmount then
+		warn("알 수 없는 후원 상품:", receiptInfo.ProductId)
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+
+	print("=== 후원 처리: " .. player.Name .. " - " .. donationAmount .. " Robux ===")
+
+	-- ⭐ 리더보드의 DataStoreName과 동일하게 사용
+	local DONATION_DATASTORE_NAME = "DonateBoardDataStore_V1"
+
+	local DataStoreService = game:GetService("DataStoreService")
+	local DonationDataStore = DataStoreService:GetOrderedDataStore(DONATION_DATASTORE_NAME)
+
+	pcall(function()
+		local currentDonation = DonationDataStore:GetAsync(player.UserId) or 0
+		local newTotal = currentDonation + donationAmount
+		DonationDataStore:SetAsync(player.UserId, newTotal)
+
+		print("후원 저장 완료:", player.Name, "총액:", newTotal)
+	end)
+
+	-- 알림 메시지
+	local Inform = ReplicatedStorage:FindFirstChild("Inform")
+	if Inform then
+		Inform.Value = "💝 " .. player.Name .. " donated " .. donationAmount .. " Robux!"
+	end
+	if donateSound then
+		donateSound:Play()
+	end
+
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
 -- 중앙 결제 처리 함수
 MarketplaceService.ProcessReceipt = function(receiptInfo)
 	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
@@ -199,19 +252,18 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 
 	-- 부활 아이템 처리
 	if receiptInfo.ProductId == REVIVE_PRODUCT_ID then
-		local success = processRevive(player)
-		if success then
-			print(player.Name .. " 부활 결제 완료!")
-			return Enum.ProductPurchaseDecision.PurchaseGranted
-		else
-			warn(player.Name .. " 부활 조건 미달로 결제 보류")
-			return Enum.ProductPurchaseDecision.NotProcessedYet
-		end
+		return processRevive(player)
 	end
 
 	-- 킬러 강제 구매 처리
 	if receiptInfo.ProductId == FORCE_KILLER_PRODUCT_ID then
 		return processKiller(player)
+	end
+
+	-- ⭐ 이 부분이 추가됨!
+	-- Donation 상품 처리
+	if DONATION_PRODUCTS[receiptInfo.ProductId] then
+		return processDonation(player, receiptInfo)
 	end
 
 	-- 알 수 없는 상품 (미래 확장용)

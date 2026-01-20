@@ -1,4 +1,4 @@
-local intermission = 15
+local intermission = 30
 local roundLength = 110
 
 local InRound = game.ReplicatedStorage.InRound
