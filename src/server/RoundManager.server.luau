@@ -1,9 +1,20 @@
-local intermission = 30
+local intermission = 10
 local roundLength = 110
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local InRound = game.ReplicatedStorage.InRound
-local status = game.ReplicatedStorage.Status
-local IsRestrictMovement = game.ReplicatedStorage.IsRestrictMovement
+local InRound = ReplicatedStorage.InRound
+local status = ReplicatedStorage.Status
+local IsSolo = ReplicatedStorage.IsSolo
+local IsRestrictMovement = ReplicatedStorage.IsRestrictMovement
+local Winner = ReplicatedStorage:WaitForChild("Winner")
+local showModeEvent = ReplicatedStorage:WaitForChild("ShowMode")
+local Mode = ReplicatedStorage:WaitForChild("Mode")
+
+local modeList = {
+	"Classic",
+	"ZeroGravity",
+}
+
 local soundService = game:GetService("SoundService")
 local Players = game:GetService("Players")
 
@@ -12,8 +23,6 @@ local cameraPart = gameObjects and gameObjects:FindFirstChild("CameraPart")
 
 local Teams = game:GetService("Teams")
 local gameEnded = false
-
-local Winner = game.ReplicatedStorage:WaitForChild("Winner")
 
 -- 현재 재생 중인 음악 추적
 local currentMusic = nil
@@ -281,6 +290,31 @@ local function getAlivePlayers()
 	return alivePlayers
 end
 
+local function ReturnLobby()
+	local lobbyTeam = Teams:FindFirstChild("Lobby")
+	for _, plr in pairs(Players:GetPlayers()) do
+		local randomLobbySpawn = getRandomLobbySpawn()
+		local char = plr.Character
+		if char then
+			local humanRoot = char:FindFirstChild("HumanoidRootPart")
+			if humanRoot then
+				humanRoot.CFrame = randomLobbySpawn.CFrame
+				humanRoot.Anchored = false
+			end
+
+			makePlayerVisible(char)
+		end
+
+		if lobbyTeam then
+			plr.Team = lobbyTeam
+			plr.TeamColor = lobbyTeam.TeamColor
+		end
+	end
+
+	Winner.Value = "None"
+	playLobbyMusic()
+end
+
 -- 팀 승리 처리
 local function handleVictory(winningTeam)
 	gameEnded = true
@@ -328,29 +362,7 @@ local function handleVictory(winningTeam)
 	print(teamName .. " 팀 승리!")
 
 	task.wait(5)
-
-	local lobbyTeam = Teams:FindFirstChild("Lobby")
-	for _, plr in pairs(Players:GetPlayers()) do
-		local randomLobbySpawn = getRandomLobbySpawn()
-		local char = plr.Character
-		if char then
-			local humanRoot = char:FindFirstChild("HumanoidRootPart")
-			if humanRoot then
-				humanRoot.CFrame = randomLobbySpawn.CFrame
-				humanRoot.Anchored = false
-			end
-
-			makePlayerVisible(char)
-		end
-
-		if lobbyTeam then
-			plr.Team = lobbyTeam
-			plr.TeamColor = lobbyTeam.TeamColor
-		end
-	end
-
-	Winner.Value = "None"
-	playLobbyMusic()
+	ReturnLobby()
 end
 
 InRound.Changed:Connect(function()
@@ -363,6 +375,9 @@ InRound.Changed:Connect(function()
 	if gameEnded then
 		if _G.resetKillerSelection then
 			_G.resetKillerSelection()
+		end
+		if _G.skyRandomSelect then
+			_G.skyRandomSelect()
 		end
 	end
 
@@ -450,41 +465,72 @@ local function isKillerAlive()
 	return false
 end
 
+-- 모드 선택 함수
+local function selectRandomMode()
+	local selectedMode = modeList[math.random(1, #modeList)]
+	Mode.Value = selectedMode
+
+	-- 모든 클라이언트에게 선택된 모드 전송
+	showModeEvent:FireAllClients(selectedMode)
+
+	print("선택된 모드:", selectedMode)
+	return selectedMode
+end
+
 local function round()
 	while true do
 		InRound.Value = false
+		IsSolo.Value = false
 		IsRestrictMovement.Value = false
 		gameEnded = false
 
-		repeat
-			for i = intermission, 0, -1 do
-				status.Value = "Game will start in " .. i .. " seconds. Need 2 or more players"
-				task.wait(1)
-			end
+		local killerTeam = Teams:FindFirstChild("Killer")
+		local playerTeam = Teams:FindFirstChild("Player")
 
-			local playerCount = #Players:GetPlayers()
-			if playerCount < 2 then
-				status.Value = "Not enough players! Waiting..."
-				task.wait(2)
-			end
-		until #Players:GetPlayers() >= 2
+		for i = intermission, 0, -1 do
+			status.Value = "Game will start in " .. i .. "s"
+			task.wait(1)
+		end
 
-		status.Value = "Selecting Killer..."
-		_G.pickRandomPlayer()
-		task.wait(3.5)
+		local playerCount = #Players:GetPlayers()
 
+		if playerCount > 1 then
+			IsSolo.Value = false
+		elseif playerCount == 1 then
+			IsSolo.Value = true
+		end
+
+		-- NOT SOLO MODE
+		if not IsSolo.Value then
+			status.Value = "Selecting Mode..."
+			selectRandomMode()
+			task.wait(3.5)
+			status.Value = "Selecting Killer..."
+			_G.pickRandomPlayer()
+			task.wait(3.5)
+		-- SOLO MODE
+		else
+			status.Value = "Selecting Mode..."
+			selectRandomMode()
+			task.wait(3.5)
+			status.Value = "Solo Mode! You are Player!"
+			local getPlayer = Players:GetPlayers()
+			local onePlayer = getPlayer[1]
+			task.wait(3)
+			onePlayer.Team = playerTeam
+		end
+
+		-- SAME IN SOLO AND NOT SOLO MODE
 		status.Value = "Teleporting to map..."
 		teleportPlayersByTeam()
 
 		IsRestrictMovement.Value = true
 
 		playGameMusic()
-
+		createStartGameWall()
 		if _G.createBricks then
 			_G.createBricks()
 		end
-
-		createStartGameWall()
 
 		for i = 10, 0, -1 do
 			status.Value = "Game starting in " .. i .. " seconds"
@@ -499,15 +545,12 @@ local function round()
 			_G.createBall()
 		end
 
-		local killerTeam = Teams:FindFirstChild("Killer")
-		local playerTeam = Teams:FindFirstChild("Player")
-
 		for i = roundLength, 0, -1 do
 			if gameEnded then
 				break
 			end
 
-			if not isKillerAlive() then
+			if not isKillerAlive() and not IsSolo.Value then
 				status.Value = "Killer has left the game!"
 				task.wait(2)
 
@@ -521,11 +564,23 @@ local function round()
 			if #alivePlayers == 0 then
 				status.Value = "All players eliminated!"
 				task.wait(2)
-				handleVictory(killerTeam)
+				if not IsSolo.Value then
+					handleVictory(killerTeam)
+				end
+				if IsSolo.Value then
+					gameEnded = true
+					InRound.Value = false
+					task.wait(3)
+					ReturnLobby()
+				end
 				break
 			end
 
-			status.Value = "Time remaining: " .. i .. "s | Survivors: " .. #alivePlayers
+			if not IsSolo.Value then
+				status.Value = "Time remaining: " .. i .. "s | Survivors: " .. #alivePlayers
+			else
+				status.Value = "Time remaining: " .. i .. "s"
+			end
 			task.wait(1)
 		end
 
@@ -534,7 +589,15 @@ local function round()
 			if #alivePlayers > 0 then
 				status.Value = "Time's up! Players survived!"
 				task.wait(2)
-				handleVictory(playerTeam)
+				if not IsSolo.Value then
+					handleVictory(playerTeam)
+				end
+				if IsSolo.Value then
+					gameEnded = true
+					InRound.Value = false
+					task.wait(3)
+					ReturnLobby()
+				end
 			end
 		end
 

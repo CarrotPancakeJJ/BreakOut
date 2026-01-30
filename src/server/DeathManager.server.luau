@@ -51,7 +51,7 @@ Players.PlayerAdded:Connect(function(player)
 
 		-- 죽었을 때
 		humanoid.Died:Connect(function()
-			event:FireAllClients()
+			--event:FireAllClients()
 
 			if InRound.Value and player.Team and player.Team.Name == "Player" then
 				-- 탈락 메시지 표시

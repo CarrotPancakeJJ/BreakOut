@@ -1,8 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService") -- [추가] 매 프레임 연산을 위해 필요
-local PhysicsService = game:GetService("PhysicsService")
 local soundService = game:GetService("SoundService")
 local BGMFolder = soundService:WaitForChild("BGM")
+
+local gameObjects = workspace:WaitForChild("GameObjects")
+local ZeroGravityBox = gameObjects:WaitForChild("ZeroGravityBox")
+local Mode = ReplicatedStorage:WaitForChild("Mode")
 
 -- 기존 RemoteEvent 및 변수 설정 유지
 local startEvent = ReplicatedStorage:FindFirstChild("StartGame")
@@ -27,6 +30,12 @@ local colors = {
 
 -- [벽돌 생성 함수 유지]
 local function createBricks()
+	if Mode.Value ~= "ZeroGravity" then
+		ZeroGravityBox.CanTouch = false
+	else
+		ZeroGravityBox.CanTouch = true
+	end
+
 	local bricksFolder = workspace:FindFirstChild("Bricks")
 	if bricksFolder then
 		bricksFolder:Destroy()
@@ -44,7 +53,12 @@ local function createBricks()
 		for col = 1, 12 do
 			local brick = Instance.new("Part")
 			brick.Size = brickSize
-			brick.Anchored = true
+			-- MODE에 따라 ANCHORED 변경
+			if Mode.Value == "ZeroGravity" then
+				brick.Anchored = false
+			else
+				brick.Anchored = true
+			end
 			brick.CastShadow = false
 			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
@@ -190,6 +204,8 @@ local function cleanupGame()
 	if bricksFolder then
 		bricksFolder:Destroy()
 	end
+
+	ZeroGravityBox:Destory()
 end
 
 -- 전역 등록

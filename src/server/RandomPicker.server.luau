@@ -13,6 +13,8 @@ local reservationKiller = {}
 
 local purchasingPlayer = nil
 
+local canKillerItemBuy = ReplicatedStorage:WaitForChild("CanKillerItemBuy")
+
 -------------------------------------------------
 -- RemoteEvents
 -------------------------------------------------
@@ -153,6 +155,7 @@ local function pickRandomPlayer()
 	end
 
 	hideGuiForAll()
+	canKillerItemBuy.Value = false
 	print("=== 랜덤 킬러 선택 완료: " .. currentKiller.Name .. " ===")
 	return
 end
@@ -189,11 +192,13 @@ local function resetKillerSelection()
 		currentKillerUserId = reservationKiller[1].UserId
 		table.remove(reservationKiller, 1)
 		hideGuiForAll()
+		canKillerItemBuy.Value = false
 	else
 		print("예약자가 없어요 그냥")
 		currentKiller = nil
 		currentKillerUserId = nil
 		showGuiForAll()
+		canKillerItemBuy.Value = true
 	end
 	teamAssigned = false
 	rouletteStarted = false

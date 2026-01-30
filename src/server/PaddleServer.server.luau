@@ -13,6 +13,8 @@ end
 local gameObjects = workspace:WaitForChild("GameObjects")
 local paddle = gameObjects:WaitForChild("Paddle")
 
+local IsSolo = ReplicatedStorage:WaitForChild("IsSolo")
+
 paddle.Anchored = true
 paddle.CanCollide = true
 paddle.CanTouch = true
@@ -43,20 +45,28 @@ movePaddleEvent.OnServerEvent:Connect(function(player, direction)
 		currentDirection = direction
 	end
 end)
-
+local function SoloPaddle()
+	if IsSolo.Value then
+		currentDirection = -1
+	end
+end
+SoloPaddle()
 -- 서버 자체 루프에서 이동 처리 (끊김 없는 이동의 핵심)
 RunService.Heartbeat:Connect(function(dt)
 	if currentDirection == 0 then
+		if IsSolo.Value then
+			currentDirection = -1
+		end
 		return
 	end -- 움직임 없으면 무시
-
 	-- 왼쪽 이동
 	if currentDirection == -1 then
 		if not isTouchingWall("LeftWall") then
 			paddle.CFrame = paddle.CFrame * CFrame.new(-speed * dt, 0, 0)
-		else
+		elseif isTouchingWall("LeftWall") and IsSolo.Value then
 			-- 벽에 닿았는데 계속 가려고 하면 멈춤 처리 (선택 사항)
 			-- currentDirection = 0
+			currentDirection = 1
 		end
 	end
 
@@ -64,7 +74,8 @@ RunService.Heartbeat:Connect(function(dt)
 	if currentDirection == 1 then
 		if not isTouchingWall("RightWall") then
 			paddle.CFrame = paddle.CFrame * CFrame.new(speed * dt, 0, 0)
-		else
+		elseif isTouchingWall("RightWall") and IsSolo.Value then
+			currentDirection = -1
 			-- currentDirection = 0
 		end
 	end
