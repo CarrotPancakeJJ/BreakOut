@@ -1,4 +1,4 @@
-local intermission = 10
+local intermission = 25
 local roundLength = 110
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -291,6 +291,12 @@ local function getAlivePlayers()
 end
 
 local function ReturnLobby()
+	if _G.resetKillerSelection then
+		_G.resetKillerSelection()
+	end
+	if _G.skyRandomSelect then
+		_G.skyRandomSelect()
+	end
 	local lobbyTeam = Teams:FindFirstChild("Lobby")
 	for _, plr in pairs(Players:GetPlayers()) do
 		local randomLobbySpawn = getRandomLobbySpawn()
@@ -369,15 +375,6 @@ InRound.Changed:Connect(function()
 	if InRound.Value == false then
 		if _G.cleanupGame then
 			_G.cleanupGame()
-		end
-	end
-
-	if gameEnded then
-		if _G.resetKillerSelection then
-			_G.resetKillerSelection()
-		end
-		if _G.skyRandomSelect then
-			_G.skyRandomSelect()
 		end
 	end
 
@@ -500,14 +497,15 @@ local function round()
 			IsSolo.Value = true
 		end
 
+		InRound.Value = true
 		-- NOT SOLO MODE
 		if not IsSolo.Value then
 			status.Value = "Selecting Mode..."
 			selectRandomMode()
-			task.wait(3.5)
+			task.wait(4)
 			status.Value = "Selecting Killer..."
 			_G.pickRandomPlayer()
-			task.wait(3.5)
+			task.wait(4)
 		-- SOLO MODE
 		else
 			status.Value = "Selecting Mode..."
@@ -538,8 +536,6 @@ local function round()
 		end
 
 		removeStartGameWall()
-
-		InRound.Value = true
 
 		if _G.createBall then
 			_G.createBall()

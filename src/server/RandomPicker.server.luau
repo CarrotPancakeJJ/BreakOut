@@ -167,7 +167,6 @@ rouletteFinishedEvent.OnServerEvent:Connect(function()
 	if teamAssigned or not currentKiller then
 		return
 	end
-
 	teamAssigned = true
 
 	for _, plr in ipairs(Players:GetPlayers()) do
@@ -181,7 +180,6 @@ rouletteFinishedEvent.OnServerEvent:Connect(function()
 	end
 	print("팀 배정 완료")
 end)
-
 -------------------------------------------------
 -- 라운드 종료 처리
 -------------------------------------------------
