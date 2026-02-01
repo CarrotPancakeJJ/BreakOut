@@ -12,7 +12,9 @@ local Mode = ReplicatedStorage:WaitForChild("Mode")
 
 local modeList = {
 	"Classic",
-	"ZeroGravity",
+	"LowGravity",
+	"Speed",
+	"Double",
 }
 
 local soundService = game:GetService("SoundService")
@@ -22,6 +24,8 @@ local gameObjects = workspace:FindFirstChild("GameObjects")
 local cameraPart = gameObjects and gameObjects:FindFirstChild("CameraPart")
 
 local Teams = game:GetService("Teams")
+local killerTeam = Teams:FindFirstChild("Killer")
+local playerTeam = Teams:FindFirstChild("Player")
 local gameEnded = false
 
 -- 현재 재생 중인 음악 추적
@@ -301,7 +305,12 @@ local function ReturnLobby()
 	for _, plr in pairs(Players:GetPlayers()) do
 		local randomLobbySpawn = getRandomLobbySpawn()
 		local char = plr.Character
+
 		if char then
+			local humanoid = char:FindFirstChild("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = 16
+			end
 			local humanRoot = char:FindFirstChild("HumanoidRootPart")
 			if humanRoot then
 				humanRoot.CFrame = randomLobbySpawn.CFrame
@@ -404,12 +413,27 @@ InRound.Changed:Connect(function()
 	end
 end)
 
+local function CheckSpeedMode()
+	if Mode.Value == "Speed" then
+		for _, player in pairs(Players:GetPlayers()) do
+			if player.Team == playerTeam then
+				local character = player.Character
+				if character then
+					local humanoid = character:FindFirstChild("Humanoid")
+					if humanoid and humanoid.Health > 0 then
+						humanoid.WalkSpeed = 45
+					end
+				end
+			end
+		end
+		roundLength = 55
+	else
+		roundLength = 110
+	end
+end
+
 -- 팀에 맞게 텔레포트
 local function teleportPlayersByTeam()
-	local Teams = game:GetService("Teams")
-	local killerTeam = Teams:FindFirstChild("Killer")
-	local playerTeam = Teams:FindFirstChild("Player")
-
 	if not cameraPart then
 		warn("CameraPart를 찾을 수 없습니다!")
 	end
@@ -426,7 +450,6 @@ local function teleportPlayersByTeam()
 					print(plr.Name .. " (Killer) - CameraPart로 텔레포트")
 				elseif plr.Team == playerTeam then
 					local randomMapSpawn = getRandomMapSpawn()
-
 					if randomMapSpawn then
 						humanRoot.CFrame = randomMapSpawn.CFrame
 						humanRoot.Anchored = false
@@ -466,7 +489,6 @@ end
 local function selectRandomMode()
 	local selectedMode = modeList[math.random(1, #modeList)]
 	Mode.Value = selectedMode
-
 	-- 모든 클라이언트에게 선택된 모드 전송
 	showModeEvent:FireAllClients(selectedMode)
 
@@ -518,6 +540,9 @@ local function round()
 			onePlayer.Team = playerTeam
 		end
 
+		-- SPEED MODE
+		CheckSpeedMode()
+
 		-- SAME IN SOLO AND NOT SOLO MODE
 		status.Value = "Teleporting to map..."
 		teleportPlayersByTeam()
@@ -538,7 +563,12 @@ local function round()
 		removeStartGameWall()
 
 		if _G.createBall then
-			_G.createBall()
+			if Mode.Value == "Double" then
+				_G.createBall(Vector3.new(0, 5, 0))
+				_G.createBall(Vector3.new(3, 5, 0))
+			else
+				_G.createBall(Vector3.new(0, 5, 0))
+			end
 		end
 
 		for i = roundLength, 0, -1 do

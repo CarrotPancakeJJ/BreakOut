@@ -14,6 +14,7 @@ local gameObjects = workspace:WaitForChild("GameObjects")
 local paddle = gameObjects:WaitForChild("Paddle")
 
 local IsSolo = ReplicatedStorage:WaitForChild("IsSolo")
+local Mode = ReplicatedStorage:WaitForChild("Mode")
 
 paddle.Anchored = true
 paddle.CanCollide = true
@@ -45,14 +46,23 @@ movePaddleEvent.OnServerEvent:Connect(function(player, direction)
 		currentDirection = direction
 	end
 end)
+
 local function SoloPaddle()
 	if IsSolo.Value then
 		currentDirection = -1
 	end
 end
+
 SoloPaddle()
 -- 서버 자체 루프에서 이동 처리 (끊김 없는 이동의 핵심)
 RunService.Heartbeat:Connect(function(dt)
+	-- 스피드 모드면 속도 증가
+	if Mode.Value == "Speed" then
+		speed = 100
+	else
+		speed = 50
+	end
+
 	if currentDirection == 0 then
 		if IsSolo.Value then
 			currentDirection = -1

@@ -11,6 +11,8 @@ local purchaseSound = BGMFolder:WaitForChild("Purchase")
 local donateSound = BGMFolder:WaitForChild("Donate")
 local reviveSound = BGMFolder:WaitForChild("Revive")
 
+local Mode = ReplicatedStorage:WaitForChild("Mode")
+
 -- 상품 ID 정의
 local REVIVE_PRODUCT_ID = 3516958082
 local FORCE_KILLER_PRODUCT_ID = 3511107004
@@ -105,6 +107,11 @@ local function processRevivePurchase(player)
 		--player:LoadCharacter()
 
 		local char = player.Character or player.CharacterAdded:Wait()
+		local humanoid = char:FindFirstChild("Humanoid")
+		-- 스피드 모드일때 속도처리
+		if humanoid and Mode.Value == "Speed" then
+			humanoid.WalkSpeed = 45
+		end
 		local humanRoot = char:WaitForChild("HumanoidRootPart")
 
 		local randomSpawn = getRandomMapSpawn()

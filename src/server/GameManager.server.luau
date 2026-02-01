@@ -4,7 +4,7 @@ local soundService = game:GetService("SoundService")
 local BGMFolder = soundService:WaitForChild("BGM")
 
 local gameObjects = workspace:WaitForChild("GameObjects")
-local ZeroGravityBox = gameObjects:WaitForChild("ZeroGravityBox")
+local LowGravityBox = gameObjects:WaitForChild("LowGravityBox")
 local Mode = ReplicatedStorage:WaitForChild("Mode")
 
 -- 기존 RemoteEvent 및 변수 설정 유지
@@ -17,7 +17,6 @@ end
 
 local INITIAL_SPEED = 30
 local SPEED_INCREMENT = 5
-local currentSpeed = INITIAL_SPEED
 
 local colors = {
 	Color3.fromRGB(255, 0, 0),
@@ -30,10 +29,10 @@ local colors = {
 
 -- [벽돌 생성 함수 유지]
 local function createBricks()
-	if Mode.Value ~= "ZeroGravity" then
-		ZeroGravityBox.CanTouch = false
+	if Mode.Value ~= "LowGravity" then
+		LowGravityBox.CanTouch = false
 	else
-		ZeroGravityBox.CanTouch = true
+		LowGravityBox.CanTouch = true
 	end
 
 	local bricksFolder = workspace:FindFirstChild("Bricks")
@@ -54,15 +53,22 @@ local function createBricks()
 			local brick = Instance.new("Part")
 			brick.Size = brickSize
 			-- MODE에 따라 ANCHORED 변경
-			if Mode.Value == "ZeroGravity" then
+			-- 무중력
+			if Mode.Value == "LowGravity" then
 				brick.Anchored = false
 			else
 				brick.Anchored = true
 			end
+			-- 스피드
+			if Mode.Value == "Double" then
+				brick.Name = "DoubleBrick"
+			else
+				brick.Name = "Brick"
+			end
 			brick.CastShadow = false
 			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
-			brick.Name = "Brick"
+			brick.Material = Enum.Material.Wood
 			brick.Parent = bricksFolder
 		end
 	end
@@ -71,25 +77,14 @@ end
 -------------------------------------------------------------
 -- [핵심 변경] Raycasting 기반 공 생성 및 이동 함수
 -------------------------------------------------------------
-local activeBallLoop = nil -- 루프 제어용 변수
 
-local function createBall()
-	-- 1. 기존 공 및 루프 정리
-	if activeBallLoop then
-		activeBallLoop:Disconnect()
-		activeBallLoop = nil
-	end
-	local oldBall = workspace:FindFirstChild("Ball")
-	if oldBall then
-		oldBall:Destroy()
-	end
-
+local function createBall(startPos)
 	-- 2. 공 생성 (Anchored = true로 설정하여 물리 엔진 영향 제거)
 	local ball = Instance.new("Part")
 	ball.Name = "Ball"
 	ball.Shape = Enum.PartType.Ball
 	ball.Size = Vector3.new(2, 2, 2)
-	ball.Position = Vector3.new(0, 5, 0)
+	ball.Position = startPos
 	ball.Color = Color3.new(1, 0.615686, 0)
 	ball.Material = Enum.Material.Neon
 	ball.Anchored = true -- [중요] 물리 엔진이 아닌 스크립트로만 이동
@@ -97,20 +92,29 @@ local function createBall()
 	ball.Parent = workspace
 
 	-- 3. 초기 속도 및 방향 설정
+	local currentSpeed
+	-- 스피드 모드면 속도 증가
+	if Mode.Value == "Speed" then
+		INITIAL_SPEED = 60
+		SPEED_INCREMENT = 20
+	else
+		INITIAL_SPEED = 30
+		SPEED_INCREMENT = 5
+	end
+
 	currentSpeed = INITIAL_SPEED
 	local direction = Vector3.new(1, 1, 0).Unit -- 초기 발사 방향
 
 	-- 레이캐스트 파라미터 (공 자신은 무시)
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = { ball }
+	rayParams.FilterDescendantsInstances = { ball, LowGravityBox }
 
-	-- 4. 매 프레임 이동 로직 (Heartbeat)
-	activeBallLoop = RunService.Heartbeat:Connect(function(dt)
+	-- [핵심] 루프를 함수 안의 지역 변수로 만듦
+	local myLoop
+	myLoop = RunService.Heartbeat:Connect(function(dt)
 		if not ball or not ball.Parent then
-			if activeBallLoop then
-				activeBallLoop:Disconnect()
-			end
+			myLoop:Disconnect() -- 공이 없어지면 이 루프만 딱 종료
 			return
 		end
 
@@ -118,6 +122,7 @@ local function createBall()
 		local stepDistance = currentSpeed * dt
 		local origin = ball.Position
 		local targetPosition = origin + (direction * stepDistance)
+		local brickSound = BGMFolder:WaitForChild("break")
 
 		-- 가려는 경로에 장애물이 있는지 레이저 발사
 		local rayResult = workspace:Raycast(origin, direction * stepDistance, rayParams)
@@ -160,8 +165,16 @@ local function createBall()
 			elseif hitName == "TopWall" then
 				-- 천장: 무조건 아래로
 				direction = Vector3.new(direction.X, -math.abs(direction.Y), 0).Unit
-			elseif hitName == "Brick" then
+				-- 더블 브릭이면
+			elseif hitName == "DoubleBrick" then
 				local brickSound = BGMFolder:WaitForChild("break")
+				if brickSound then
+					brickSound:Play()
+				end
+				-- 벽돌 파괴
+				hitPart.Name = "Brick"
+				hitPart.Transparency = 0.7
+			elseif hitName == "Brick" then
 				if brickSound then
 					brickSound:Play()
 				end
@@ -190,22 +203,16 @@ end
 
 -- 게임 정리 함수
 local function cleanupGame()
-	if activeBallLoop then
-		activeBallLoop:Disconnect()
-		activeBallLoop = nil
-	end
-
-	local ball = workspace:FindFirstChild("Ball")
-	if ball then
-		ball:Destroy()
+	for _, obj in ipairs(workspace:GetChildren()) do
+		if obj.Name == "Ball" then
+			obj:Destroy()
+		end
 	end
 
 	local bricksFolder = workspace:FindFirstChild("Bricks")
 	if bricksFolder then
 		bricksFolder:Destroy()
 	end
-
-	ZeroGravityBox:Destory()
 end
 
 -- 전역 등록

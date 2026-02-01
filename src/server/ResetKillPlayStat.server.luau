@@ -10,7 +10,7 @@
 -- local playerDS = DataStoreService:GetOrderedDataStore(PLAYER_DS_NAME)
 
 -- -- ⚠️ 초기화할 유저의 정확한 아이디(Username)를 입력하세요.
--- local TARGET_USERNAME = "Manifest100t"
+-- local TARGET_USERNAME = "testplay1216"
 
 -- local function ResetPlayerStats()
 -- 	-------------------------------------------------------

@@ -6,7 +6,7 @@
 -- local CONFIG_STAT_NAME = "TimePlayed" -- Settings의 NAME_OF_STAT 값 (없으면 "" 빈칸)
 
 -- -- 초기화할 유저 닉네임
--- local TARGET_USERNAME = "Manifest100t"
+-- local TARGET_USERNAME = "GreenTeaExpress"
 
 -- --------------------------------------------------------------
 
