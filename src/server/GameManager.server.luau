@@ -46,12 +46,20 @@ local function createBricks()
 
 	local startX = -20
 	local startY = 50
-	local brickSize = Vector3.new(8, 4, 15)
 
 	for row = 1, 7 do
 		for col = 1, 12 do
 			local brick = Instance.new("Part")
-			brick.Size = brickSize
+			--brick.Shape = Enum.PartType.Ball
+
+			-- Tiny 모드냐 아니냐에 따른 블록사이즈 정리
+			if Mode.Value == "Tiny" then
+				brick.Size = Vector3.new(6, 1, 12)
+				brick.Position = Vector3.new(startX + col * 12, startY - row * 8, 0)
+			else
+				brick.Size = Vector3.new(8, 4, 15)
+				brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
+			end
 			-- MODE에 따라 ANCHORED 변경
 			-- 무중력
 			if Mode.Value == "LowGravity" then
@@ -66,7 +74,6 @@ local function createBricks()
 				brick.Name = "Brick"
 			end
 			brick.CastShadow = false
-			brick.Position = Vector3.new(startX + col * 12, startY - row * 6, 0)
 			brick.Color = colors[math.random(1, #colors)]
 			brick.Material = Enum.Material.Wood
 			brick.Parent = bricksFolder

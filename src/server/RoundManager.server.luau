@@ -1,4 +1,4 @@
-local intermission = 25
+local intermission = 10
 local roundLength = 110
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,6 +15,7 @@ local modeList = {
 	"LowGravity",
 	"Speed",
 	"Double",
+	"Tiny",
 }
 
 local soundService = game:GetService("SoundService")
@@ -42,6 +43,31 @@ if gameObjectsFolder then
 	originalStartGameWall = gameObjectsFolder:FindFirstChild("StartGameWall")
 	if originalStartGameWall then
 		originalStartGameWall = originalStartGameWall:Clone()
+	end
+end
+
+-- 플레이어 작게 만들기
+local function CheckTinyMode()
+	local tinyScale = 0.3
+	if Mode.Value == "Tiny" then
+		for _, player in pairs(Players:GetPlayers()) do
+			if player.Team == playerTeam then
+				local character = player.Character
+				if character then
+					local humanoid = character:FindFirstChild("Humanoid")
+					if humanoid then
+						local description = humanoid:GetAppliedDescription()
+						-- 크기 관련 속성 조절 (1이 기본값)
+						description.HeightScale = tinyScale
+						description.WidthScale = tinyScale
+						description.DepthScale = tinyScale
+						description.HeadScale = tinyScale
+						-- 변경사항 적용
+						humanoid:ApplyDescription(description)
+					end
+				end
+			end
+		end
 	end
 end
 
@@ -486,8 +512,7 @@ local function isKillerAlive()
 end
 
 -- 모드 선택 함수
-local function selectRandomMode()
-	local selectedMode = modeList[math.random(1, #modeList)]
+local function selectRandomMode(selectedMode)
 	Mode.Value = selectedMode
 	-- 모든 클라이언트에게 선택된 모드 전송
 	showModeEvent:FireAllClients(selectedMode)
@@ -506,10 +531,14 @@ local function round()
 		local killerTeam = Teams:FindFirstChild("Killer")
 		local playerTeam = Teams:FindFirstChild("Player")
 
+		_G.votingStart()
+
 		for i = intermission, 0, -1 do
 			status.Value = "Game will start in " .. i .. "s"
 			task.wait(1)
 		end
+
+		_G.votingEnd()
 
 		local playerCount = #Players:GetPlayers()
 
@@ -523,7 +552,6 @@ local function round()
 		-- NOT SOLO MODE
 		if not IsSolo.Value then
 			status.Value = "Selecting Mode..."
-			selectRandomMode()
 			task.wait(4)
 			status.Value = "Selecting Killer..."
 			_G.pickRandomPlayer()
@@ -531,7 +559,6 @@ local function round()
 		-- SOLO MODE
 		else
 			status.Value = "Selecting Mode..."
-			selectRandomMode()
 			task.wait(3.5)
 			status.Value = "Solo Mode! You are Player!"
 			local getPlayer = Players:GetPlayers()
@@ -542,6 +569,9 @@ local function round()
 
 		-- SPEED MODE
 		CheckSpeedMode()
+
+		-- TINY MODE
+		CheckTinyMode()
 
 		-- SAME IN SOLO AND NOT SOLO MODE
 		status.Value = "Teleporting to map..."
@@ -637,5 +667,6 @@ playLobbyMusic()
 -- 부활 관련 함수를 _G에 export (Marketplace 스크립트에서 사용)
 _G.getRandomMapSpawn = getRandomMapSpawn
 _G.makePlayerVisible = makePlayerVisible
+_G.selectRandomMode = selectRandomMode
 
 task.spawn(round)
